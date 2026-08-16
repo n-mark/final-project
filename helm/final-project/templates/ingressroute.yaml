@@ -1,0 +1,61 @@
+{{- if .Values.traefik.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: finalproj-public
+  namespace: {{ .Values.namespace }}
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`{{ .Values.traefik.host }}`) && PathPrefix(`/api/v1/auth`)
+      kind: Rule
+      services:
+        - name: auth
+          port: {{ .Values.services.auth.port }}
+    - match: Host(`{{ .Values.traefik.host }}`) && PathPrefix(`/api/v1/users`)
+      kind: Rule
+      services:
+        - name: profile
+          port: {{ .Values.services.profile.port }}
+    - match: Host(`{{ .Values.traefik.host }}`) && PathPrefix(`/api/v1/adverts`)
+      kind: Rule
+      services:
+        - name: advert-cmd
+          port: {{ .Values.services.advertCmd.port }}
+    - match: Host(`{{ .Values.traefik.host }}`) && PathPrefix(`/api/v1/search`)
+      kind: Rule
+      services:
+        - name: advert-query
+          port: {{ .Values.services.advertQuery.port }}
+    - match: Host(`{{ .Values.traefik.host }}`) && PathPrefix(`/api/v1/orders`)
+      kind: Rule
+      services:
+        - name: order
+          port: {{ .Values.services.order.port }}
+    - match: Host(`{{ .Values.traefik.host }}`) && PathPrefix(`/api/v1/billing`)
+      kind: Rule
+      services:
+        - name: billing
+          port: {{ .Values.services.billing.port }}
+    - match: Host(`{{ .Values.traefik.host }}`) && PathPrefix(`/api/v1/deliveries`)
+      kind: Rule
+      services:
+        - name: delivery
+          port: {{ .Values.services.delivery.port }}
+    - match: Host(`{{ .Values.traefik.host }}`) && PathPrefix(`/api/v1/notifications`)
+      kind: Rule
+      services:
+        - name: notification
+          port: {{ .Values.services.notification.port }}
+    - match: Host(`{{ .Values.traefik.host }}`) && PathPrefix(`/api/v1/dialogs`)
+      kind: Rule
+      services:
+        - name: dialog
+          port: {{ .Values.services.dialog.port }}
+    - match: Host(`{{ .Values.traefik.host }}`) && PathPrefix(`/api/v1/bff`)
+      kind: Rule
+      services:
+        - name: bff
+          port: {{ .Values.services.bff.port }}
+{{- end }}

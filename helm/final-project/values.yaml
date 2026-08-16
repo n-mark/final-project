@@ -1,0 +1,77 @@
+namespace: final-proj
+
+image:
+  registry: docker.io
+  tag: finalproj-latest
+  pullPolicy: Always
+
+replicas:
+  default: 1
+
+resources:
+  requests:
+    cpu: "50m"
+    memory: "64Mi"
+  limits:
+    cpu: "200m"
+    memory: "128Mi"
+
+postgres:
+  enabled: true
+  storage: 1Gi
+
+kafka:
+  enabled: true
+  replicas: 3
+  storage: 2Gi
+
+opensearch:
+  enabled: true
+  replicas: 3
+  storage: 5Gi
+
+redis:
+  enabled: true
+  storage: 1Gi
+
+services:
+  auth:
+    image: auth-service
+    port: 8080
+  profile:
+    image: profile-service
+    port: 8080
+  order:
+    image: ordersvc
+    port: 8080
+  billing:
+    image: billingsvc
+    port: 8080
+  notification:
+    image: notificationsvc
+    port: 8080
+  delivery:
+    image: delivery-service
+    port: 8080
+  dialog:
+    image: dialog-svc
+    port: 8080
+  advertCmd:
+    image: advert-cmd-svc
+    port: 8080
+  advertQuery:
+    image: advert-query
+    port: 8080
+  advertValidation:
+    image: advert-validation-svc
+    port: 8080
+  advertPostprocessor:
+    image: advert-postprocessor
+    port: 8080
+  bff:
+    image: advert-proj-bff
+    port: 8080
+
+traefik:
+  enabled: true
+  host: finalproj.local
