@@ -1,0 +1,546 @@
+---
+# Per-service Postgres instances: profile, order, billing, notification, delivery, advert-cmd, dialog
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-profiles-config
+  namespace: final-proj
+data:
+  POSTGRES_USER: "profile_user"
+  POSTGRES_DB: "profiledb"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-profiles-secret
+  namespace: final-proj
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "profile_password"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-profiles-pvc
+  namespace: final-proj
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-profiles
+  namespace: final-proj
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-profiles
+  template:
+    metadata:
+      labels:
+        app: postgres-profiles
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgres-profiles-config
+            - secretRef:
+                name: postgres-profiles-secret
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-profiles-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-profiles
+  namespace: final-proj
+spec:
+  selector:
+    app: postgres-profiles
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+# order
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-orders-config
+  namespace: final-proj
+data:
+  POSTGRES_USER: "order_user"
+  POSTGRES_DB: "orderdb"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-orders-secret
+  namespace: final-proj
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "order_password"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-orders-pvc
+  namespace: final-proj
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-orders
+  namespace: final-proj
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-orders
+  template:
+    metadata:
+      labels:
+        app: postgres-orders
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgres-orders-config
+            - secretRef:
+                name: postgres-orders-secret
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-orders-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-orders
+  namespace: final-proj
+spec:
+  selector:
+    app: postgres-orders
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+# billing
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-billing-config
+  namespace: final-proj
+data:
+  POSTGRES_USER: "billing_user"
+  POSTGRES_DB: "billingdb"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-billing-secret
+  namespace: final-proj
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "billing_password"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-billing-pvc
+  namespace: final-proj
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-billing
+  namespace: final-proj
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-billing
+  template:
+    metadata:
+      labels:
+        app: postgres-billing
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgres-billing-config
+            - secretRef:
+                name: postgres-billing-secret
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-billing-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-billing
+  namespace: final-proj
+spec:
+  selector:
+    app: postgres-billing
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+# notification
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-notifications-config
+  namespace: final-proj
+data:
+  POSTGRES_USER: "notification_user"
+  POSTGRES_DB: "notificationdb"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-notifications-secret
+  namespace: final-proj
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "notification_password"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-notifications-pvc
+  namespace: final-proj
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-notifications
+  namespace: final-proj
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-notifications
+  template:
+    metadata:
+      labels:
+        app: postgres-notifications
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgres-notifications-config
+            - secretRef:
+                name: postgres-notifications-secret
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-notifications-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-notifications
+  namespace: final-proj
+spec:
+  selector:
+    app: postgres-notifications
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+# delivery
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-delivery-config
+  namespace: final-proj
+data:
+  POSTGRES_USER: "delivery_user"
+  POSTGRES_DB: "deliverydb"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-delivery-secret
+  namespace: final-proj
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "delivery_password"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-delivery-pvc
+  namespace: final-proj
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-delivery
+  namespace: final-proj
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-delivery
+  template:
+    metadata:
+      labels:
+        app: postgres-delivery
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgres-delivery-config
+            - secretRef:
+                name: postgres-delivery-secret
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-delivery-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-delivery
+  namespace: final-proj
+spec:
+  selector:
+    app: postgres-delivery
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+# advert-cmd
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-advertcmd-config
+  namespace: final-proj
+data:
+  POSTGRES_USER: "advertcmd_user"
+  POSTGRES_DB: "advertcmddb"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-advertcmd-secret
+  namespace: final-proj
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "advertcmd_password"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-advertcmd-pvc
+  namespace: final-proj
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-advertcmd
+  namespace: final-proj
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-advertcmd
+  template:
+    metadata:
+      labels:
+        app: postgres-advertcmd
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgres-advertcmd-config
+            - secretRef:
+                name: postgres-advertcmd-secret
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-advertcmd-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-advertcmd
+  namespace: final-proj
+spec:
+  selector:
+    app: postgres-advertcmd
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+# dialog
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-dialog-config
+  namespace: final-proj
+data:
+  POSTGRES_USER: "dialog_user"
+  POSTGRES_DB: "dialogdb"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-dialog-secret
+  namespace: final-proj
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "dialog_password"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-dialog-pvc
+  namespace: final-proj
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-dialog
+  namespace: final-proj
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-dialog
+  template:
+    metadata:
+      labels:
+        app: postgres-dialog
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgres-dialog-config
+            - secretRef:
+                name: postgres-dialog-secret
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-dialog-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-dialog
+  namespace: final-proj
+spec:
+  selector:
+    app: postgres-dialog
+  ports:
+    - port: 5432
+      targetPort: 5432

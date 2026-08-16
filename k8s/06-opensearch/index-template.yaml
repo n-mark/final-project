@@ -1,0 +1,41 @@
+---
+# OpenSearch index template with 3 shards / 2 replicas.
+# Apply after OpenSearch cluster is green.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opensearch-index-template
+  namespace: final-proj
+data:
+  template.json: |
+    {
+      "index_patterns": ["adverts-*"],
+      "template": {
+        "settings": {
+          "number_of_shards": 3,
+          "number_of_replicas": 2
+        },
+        "mappings": {
+          "properties": {
+            "id": { "type": "keyword" },
+            "title": { "type": "text" },
+            "description": { "type": "text" },
+            "condition": { "type": "keyword" },
+            "size_letter": { "type": "keyword" },
+            "size_number": { "type": "integer" },
+            "brand": { "type": "keyword" },
+            "price": { "type": "integer" },
+            "gender": { "type": "keyword" },
+            "shipping_available": { "type": "boolean" },
+            "created_by": { "type": "keyword" },
+            "created_time": { "type": "date" },
+            "current_state": { "type": "keyword" },
+            "address": { "type": "text" },
+            "colors": { "type": "keyword" },
+            "categories": { "type": "keyword" },
+            "pictures": { "type": "keyword" },
+            "embedding": { "type": "dense_vector", "dims": 768 }
+          }
+        }
+      }
+    }

@@ -1,0 +1,79 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opensearch-config
+  namespace: final-proj
+data:
+  OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+  DISABLE_INSTALL_DEMO_CONFIG: "true"
+  DISABLE_SECURITY_PLUGIN: "true"
+  discovery.seed_hosts: "opensearch-0.opensearch,opensearch-1.opensearch,opensearch-2.opensearch"
+  cluster.initial_master_nodes: "opensearch-0,opensearch-1,opensearch-2"
+  cluster.name: "finalproj-opensearch"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: opensearch-secret
+  namespace: final-proj
+type: Opaque
+stringData:
+  OPENSEARCH_USERNAME: "admin"
+  OPENSEARCH_PASSWORD: "admin_password"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: opensearch
+  namespace: final-proj
+spec:
+  selector:
+    app: opensearch
+  ports:
+    - port: 9200
+      targetPort: 9200
+    - port: 9300
+      targetPort: 9300
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: opensearch
+  namespace: final-proj
+spec:
+  serviceName: opensearch
+  replicas: 3
+  selector:
+    matchLabels:
+      app: opensearch
+  template:
+    metadata:
+      labels:
+        app: opensearch
+    spec:
+      containers:
+        - name: opensearch
+          image: opensearchproject/opensearch:2.14.0
+          ports:
+            - containerPort: 9200
+            - containerPort: 9300
+          envFrom:
+            - configMapRef:
+                name: opensearch-config
+            - secretRef:
+                name: opensearch-secret
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/opensearch/data
+          resources:
+            requests: { cpu: "300m", memory: "1Gi" }
+            limits:   { cpu: "1", memory: "2Gi" }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
