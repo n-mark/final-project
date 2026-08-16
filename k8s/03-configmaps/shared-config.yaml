@@ -1,0 +1,43 @@
+---
+# Shared service discovery and broker settings used by all microservices.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shared-config
+  namespace: final-proj
+data:
+  # Service URLs
+  AUTH_URL: "http://auth-service:8080"
+  PROFILE_URL: "http://profile-service:8080"
+  ADVERT_CMD_URL: "http://advert-cmd-svc:8080"
+  ADVERT_QUERY_URL: "http://advert-query:8080"
+  ADVERT_VALIDATION_URL: "http://advert-validation-svc:8080"
+  ADVERT_POSTPROCESSOR_URL: "http://advert-postprocessor:8080"
+  ORDER_URL: "http://order-svc:8080"
+  BILLING_URL: "http://billing-svc:8080"
+  DELIVERY_URL: "http://delivery-service:8080"
+  NOTIFICATION_URL: "http://notification-svc:8080"
+  DIALOG_URL: "http://dialog-svc:8080"
+  BFF_URL: "http://advert-proj-bff:8080"
+
+  # Databases
+  PG_HOST_AUTH: "postgres-shared"
+  PG_HOST_PROFILE: "postgres-profiles"
+  PG_HOST_ORDER: "postgres-orders"
+  PG_HOST_BILLING: "postgres-billing"
+  PG_HOST_NOTIFICATION: "postgres-notifications"
+  PG_HOST_DELIVERY: "postgres-delivery"
+  PG_HOST_ADVERTCMD: "postgres-advertcmd"
+  PG_HOST_DIALOG: "postgres-dialog"
+  PG_PORT: "5432"
+  PG_SSLMODE: "disable"
+
+  # Kafka
+  KAFKA_BROKERS: "kafka:9092"
+
+  # OpenSearch
+  OPENSEARCH_URL: "http://opensearch:9200"
+
+  # Redis
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"

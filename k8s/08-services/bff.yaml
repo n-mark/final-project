@@ -1,0 +1,68 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: advert-proj-bff-config
+  namespace: final-proj
+data:
+  APP_PORT: "8080"
+  AUTH_URL: "http://auth-service:8080"
+  PROFILE_URL: "http://profile-service:8080"
+  ADVERT_CMD_URL: "http://advert-cmd-svc:8080"
+  ADVERT_QUERY_URL: "http://advert-query:8080"
+  ORDER_URL: "http://order-service:8080"
+  BILLING_URL: "http://billing-service:8080"
+  DELIVERY_URL: "http://delivery-service:8080"
+  DIALOG_URL: "http://dialog-service:8080"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: advert-proj-bff
+  namespace: final-proj
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: advert-proj-bff
+  template:
+    metadata:
+      labels:
+        app: advert-proj-bff
+    spec:
+      containers:
+        - name: bff
+          image: mblkuta/advert-proj-bff:finalproj-latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: advert-proj-bff-config
+            - secretRef:
+                name: shared-secrets
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits:   { cpu: "200m", memory: "128Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: advert-proj-bff
+  namespace: final-proj
+spec:
+  selector:
+    app: advert-proj-bff
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

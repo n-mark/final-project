@@ -1,0 +1,86 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dialog-service-config
+  namespace: final-proj
+data:
+  APP_PORT: "8080"
+  PG_HOST: "postgres-dialog"
+  PG_PORT: "5432"
+  PG_DATABASE: "dialogdb"
+  PG_SSLMODE: "disable"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  BROADCAST_TYPE: "redis"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dialog-service-secret
+  namespace: final-proj
+type: Opaque
+stringData:
+  PG_USER: "dialog_user"
+  PG_PASSWORD: "dialog_password"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dialog-service
+  namespace: final-proj
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dialog-service
+  template:
+    metadata:
+      labels:
+        app: dialog-service
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command: ["sh","-c","until nc -z postgres-dialog 5432; do echo waiting...; sleep 2; done"]
+          resources:
+            requests: { cpu: "10m", memory: "16Mi" }
+            limits:   { cpu: "50m", memory: "32Mi" }
+      containers:
+        - name: dialog-service
+          image: mblkuta/dialog-svc:finalproj-latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: dialog-service-config
+            - secretRef:
+                name: dialog-service-secret
+            - secretRef:
+                name: shared-secrets
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits:   { cpu: "200m", memory: "128Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dialog-service
+  namespace: final-proj
+spec:
+  selector:
+    app: dialog-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

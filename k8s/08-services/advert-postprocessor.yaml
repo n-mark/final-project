@@ -1,0 +1,66 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: advert-postprocessor-config
+  namespace: final-proj
+data:
+  APP_PORT: "8080"
+  BROKER_TYPE: "KAFKA"
+  KAFKA_BROKERS: "kafka:9092"
+  KAFKA_CONSUMER_GROUP: "advert-postprocessor"
+  KAFKA_TOPICS: "adverts.created"
+  OPENSEARCH_URL: "http://opensearch:9200"
+  ADVERT_INDEX: "adverts-*"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: advert-postprocessor
+  namespace: final-proj
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: advert-postprocessor
+  template:
+    metadata:
+      labels:
+        app: advert-postprocessor
+    spec:
+      containers:
+        - name: advert-postprocessor
+          image: mblkuta/advert-postprocessor:finalproj-latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: advert-postprocessor-config
+            - secretRef:
+                name: shared-secrets
+          readinessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits:   { cpu: "300m", memory: "256Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: advert-postprocessor
+  namespace: final-proj
+spec:
+  selector:
+    app: advert-postprocessor
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
