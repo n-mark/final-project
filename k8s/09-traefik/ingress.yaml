@@ -9,28 +9,53 @@ spec:
   entryPoints:
     - web
   routes:
-    # Auth service
-    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/auth`)
+    # Auth service — register, login, confirm
+    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/register`)
+      kind: Rule
+      services:
+        - name: auth-service
+          port: 8080
+    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/login`)
+      kind: Rule
+      services:
+        - name: auth-service
+          port: 8080
+    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/confirm`)
       kind: Rule
       services:
         - name: auth-service
           port: 8080
 
     # Profile service
-    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/users`)
+    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/profile`)
       kind: Rule
       services:
         - name: profile-service
           port: 8080
 
-    # Advert command service
+    # Advert command service — adverts CRUD + reference data
     - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/adverts`)
       kind: Rule
       services:
         - name: advert-cmd-svc
           port: 8080
+    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/categories`)
+      kind: Rule
+      services:
+        - name: advert-cmd-svc
+          port: 8080
+    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/brands`)
+      kind: Rule
+      services:
+        - name: advert-cmd-svc
+          port: 8080
+    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/colors`)
+      kind: Rule
+      services:
+        - name: advert-cmd-svc
+          port: 8080
 
-    # Advert query service
+    # Advert query service — search
     - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/search`)
       kind: Rule
       services:
@@ -38,27 +63,37 @@ spec:
           port: 8080
 
     # Order service
-    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/orders`)
+    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/order`)
       kind: Rule
       services:
         - name: order-service
           port: 8080
 
-    # Billing service
-    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/billing`)
+    # Billing service — transactions
+    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/transaction`)
       kind: Rule
       services:
         - name: billing-service
           port: 8080
 
     # Delivery service
-    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/deliveries`)
+    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/delivery`)
+      kind: Rule
+      services:
+        - name: delivery-service
+          port: 8080
+    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/providers`)
       kind: Rule
       services:
         - name: delivery-service
           port: 8080
 
     # Notification service
+    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/notification`)
+      kind: Rule
+      services:
+        - name: notification-service
+          port: 8080
     - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/notifications`)
       kind: Rule
       services:
@@ -66,7 +101,12 @@ spec:
           port: 8080
 
     # Dialog service
-    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/dialogs`)
+    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/dialog`)
+      kind: Rule
+      services:
+        - name: dialog-service
+          port: 8080
+    - match: Host(`finalproj.local`) && PathPrefix(`/api/v1/conversations`)
       kind: Rule
       services:
         - name: dialog-service

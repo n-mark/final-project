@@ -5,13 +5,16 @@ metadata:
   name: advert-postprocessor-config
   namespace: final-proj
 data:
-  APP_PORT: "8080"
   BROKER_TYPE: "KAFKA"
   KAFKA_BROKERS: "kafka:9092"
-  KAFKA_CONSUMER_GROUP: "advert-postprocessor"
-  KAFKA_TOPICS: "adverts.created"
+  POST_VALIDATION_TOPIC: "post-validation"
+  CONSUMER_GROUP_ID: "advert-postprocessor"
+  ADVERT_SERVICE_URL: "http://advert-cmd-svc:8080"
+  GIS_DATABASE_URL: "postgres://gis_user:gis_password@postgres-gis:5432/gis?sslmode=disable"
   OPENSEARCH_URL: "http://opensearch:9200"
-  ADVERT_INDEX: "adverts-*"
+  OPENSEARCH_INDEX: "adverts"
+  EMBEDDINGS_ENABLED: "false"
+  METRICS_ADDR: ":9090"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -28,24 +31,31 @@ spec:
       labels:
         app: advert-postprocessor
     spec:
+      initContainers:
+        - name: wait-for-gis
+          image: busybox:1.36
+          command: ["sh","-c","until nc -z postgres-gis 5432; do echo waiting for postgres-gis...; sleep 2; done"]
+          resources:
+            requests: { cpu: "10m", memory: "16Mi" }
+            limits:   { cpu: "50m", memory: "32Mi" }
       containers:
         - name: advert-postprocessor
           image: mblkuta/advert-postprocessor:finalproj-latest
           imagePullPolicy: Always
           ports:
-            - name: http
-              containerPort: 8080
+            - name: metrics
+              containerPort: 9090
           envFrom:
             - configMapRef:
                 name: advert-postprocessor-config
             - secretRef:
                 name: shared-secrets
           readinessProbe:
-            httpGet: { path: /health, port: http }
+            httpGet: { path: /metrics, port: metrics }
             initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
-            httpGet: { path: /health, port: http }
+            httpGet: { path: /metrics, port: metrics }
             initialDelaySeconds: 15
             periodSeconds: 10
           resources:
@@ -61,6 +71,6 @@ spec:
   selector:
     app: advert-postprocessor
   ports:
-    - name: http
-      port: 8080
-      targetPort: 8080
+    - name: metrics
+      port: 9090
+      targetPort: 9090

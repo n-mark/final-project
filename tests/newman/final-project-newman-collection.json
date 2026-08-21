@@ -1,0 +1,1380 @@
+{
+  "info": {
+    "_postman_id": "final-project-e2e-collection-v2",
+    "name": "Final Project - E2E Microservices Collection",
+    "description": "Newman collection covering all HTTP scenarios exposed via Traefik. Uses two users: seller (user1) and buyer (user2).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost" },
+    { "key": "user1_username", "value": "" },
+    { "key": "user1_email", "value": "" },
+    { "key": "user1_password", "value": "Password123!" },
+    { "key": "user1_token", "value": "" },
+    { "key": "user1_id", "value": "" },
+    { "key": "user2_username", "value": "" },
+    { "key": "user2_email", "value": "" },
+    { "key": "user2_password", "value": "Password123!" },
+    { "key": "user2_token", "value": "" },
+    { "key": "user2_id", "value": "" },
+    { "key": "advert_id", "value": "" },
+    { "key": "order_id", "value": "" },
+    { "key": "transaction_id", "value": "" },
+    { "key": "provider_id", "value": "" },
+    { "key": "poll_interval_ms", "value": "2000" },
+    { "key": "poll_timeout_ms", "value": "60000" },
+    { "key": "bff_poll_interval_ms", "value": "3000" },
+    { "key": "bff_poll_timeout_ms", "value": "30000" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.variables.get('e2e_suffix')) {",
+          "    pm.variables.set('e2e_suffix', Date.now().toString());",
+          "}",
+          "var suffix = pm.variables.get('e2e_suffix');",
+          "pm.collectionVariables.set('e2e_suffix', suffix);",
+          "pm.collectionVariables.set('user1_username', 'seller_' + suffix);",
+          "pm.collectionVariables.set('user1_email', 'seller_' + suffix + '@example.com');",
+          "pm.collectionVariables.set('user1_phone', '+79' + suffix.slice(-8));",
+          "pm.collectionVariables.set('user2_username', 'buyer_' + suffix);",
+          "pm.collectionVariables.set('user2_email', 'buyer_' + suffix + '@example.com');",
+          "pm.collectionVariables.set('user2_phone', '+78' + suffix.slice(-8));"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Auth: Register User 1 (Seller)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"username\":\"{{user1_username}}\",\"password\":\"{{user1_password}}\",\"email\":\"{{user1_email}}\",\"phone\":\"{{user1_phone}}\"}"
+        },
+        "url": "{{base_url}}/api/v1/register"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "pm.test('Response has id', function () { pm.expect(json.id).to.exist; });",
+              "pm.collectionVariables.set('user1_id', json.id.toString());"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Auth: Register User 2 (Buyer)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"username\":\"{{user2_username}}\",\"password\":\"{{user2_password}}\",\"email\":\"{{user2_email}}\",\"phone\":\"{{user2_phone}}\"}"
+        },
+        "url": "{{base_url}}/api/v1/register"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "pm.test('Response has id', function () { pm.expect(json.id).to.exist; });",
+              "pm.collectionVariables.set('user2_id', json.id.toString());"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Auth: Register Duplicate - 409",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"username\":\"{{user1_username}}\",\"password\":\"{{user1_password}}\",\"email\":\"{{user1_email}}\",\"phone\":\"{{user1_phone}}\"}"
+        },
+        "url": "{{base_url}}/api/v1/register"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 409', function () { pm.response.to.have.status(409); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Auth: Register Missing Password - 400",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"username\":\"incomplete\",\"email\":\"incomplete@example.com\"}"
+        },
+        "url": "{{base_url}}/api/v1/register"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 400', function () { pm.response.to.have.status(400); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 - Auth: Confirm User 1 via inbox_mock",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/notification/inbox_mock/{{user1_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var expected = 200;",
+              "var interval = Number(pm.collectionVariables.get('poll_interval_ms')) || 2000;",
+              "var timeout = Number(pm.collectionVariables.get('poll_timeout_ms')) || 20000;",
+              "var maxRetries = Math.max(1, Math.ceil(timeout / interval));",
+              "var retries = 0;",
+              "function poll() {",
+              "    pm.sendRequest(pm.request.url.toString(), function (err, res) {",
+              "        var code = res ? res.code : null;",
+              "        if (!err && code === expected) {",
+              "            var notifications = res.json();",
+              "            if (notifications && Array.isArray(notifications) && notifications.length > 0) {",
+              "                var msg = notifications[0].message || notifications[0].text || '';",
+              "                var tokenMatch = msg.match(/token=([a-f0-9]+)/);",
+              "                if (tokenMatch) {",
+              "                    pm.test('Status code is 200', function () { pm.expect(code).to.eql(expected); });",
+              "                    pm.test('Has notifications', function () { pm.expect(notifications).to.be.an('array').that.is.not.empty; });",
+              "                    pm.test('Token found in notification', function () { pm.expect(tokenMatch).to.not.be.null; });",
+              "                    pm.collectionVariables.set('confirm_token_1', tokenMatch[1]);",
+              "                    return;",
+              "                }",
+              "            }",
+              "        }",
+              "        retries++;",
+              "        if (retries < maxRetries) {",
+              "            setTimeout(poll, interval);",
+              "            return;",
+              "        }",
+              "        var last = res ? res.code : (err ? err.message : 'no response');",
+              "        pm.test('Status code is 200', function () { pm.expect(code).to.eql(expected, 'Timed out waiting for notification after ' + (maxRetries * interval / 1000) + 's. Last status: ' + last); });",
+              "    });",
+              "}",
+              "setTimeout(poll, interval);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 - Auth: Confirm User 1 Account",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/confirm?token={{confirm_token_1}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "confirm"],
+          "query": [{ "key": "token", "value": "{{confirm_token_1}}" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "var body = pm.response.text();",
+              "pm.test('No error in response', function () { pm.expect(body).to.not.include('error'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 - Auth: Confirm User 2 via inbox_mock",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/notification/inbox_mock/{{user2_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var expected = 200;",
+              "var interval = Number(pm.collectionVariables.get('poll_interval_ms')) || 2000;",
+              "var timeout = Number(pm.collectionVariables.get('poll_timeout_ms')) || 20000;",
+              "var maxRetries = Math.max(1, Math.ceil(timeout / interval));",
+              "var retries = 0;",
+              "function poll() {",
+              "    pm.sendRequest(pm.request.url.toString(), function (err, res) {",
+              "        var code = res ? res.code : null;",
+              "        if (!err && code === expected) {",
+              "            var notifications = res.json();",
+              "            if (notifications && Array.isArray(notifications) && notifications.length > 0) {",
+              "                var msg = notifications[0].message || notifications[0].text || '';",
+              "                var tokenMatch = msg.match(/token=([a-f0-9]+)/);",
+              "                if (tokenMatch) {",
+              "                    pm.test('Status code is 200', function () { pm.expect(code).to.eql(expected); });",
+              "                    pm.test('Has notifications', function () { pm.expect(notifications).to.be.an('array').that.is.not.empty; });",
+              "                    pm.test('Token found in notification', function () { pm.expect(tokenMatch).to.not.be.null; });",
+              "                    pm.collectionVariables.set('confirm_token_2', tokenMatch[1]);",
+              "                    return;",
+              "                }",
+              "            }",
+              "        }",
+              "        retries++;",
+              "        if (retries < maxRetries) {",
+              "            setTimeout(poll, interval);",
+              "            return;",
+              "        }",
+              "        var last = res ? res.code : (err ? err.message : 'no response');",
+              "        pm.test('Status code is 200', function () { pm.expect(code).to.eql(expected, 'Timed out waiting for notification after ' + (maxRetries * interval / 1000) + 's. Last status: ' + last); });",
+              "    });",
+              "}",
+              "setTimeout(poll, interval);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 - Auth: Confirm User 2 Account",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/confirm?token={{confirm_token_2}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "confirm"],
+          "query": [{ "key": "token", "value": "{{confirm_token_2}}" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "var body = pm.response.text();",
+              "pm.test('No error in response', function () { pm.expect(body).to.not.include('error'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 - Auth: Login User 1 (Seller)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"username\":\"{{user1_username}}\",\"password\":\"{{user1_password}}\"}"
+        },
+        "url": "{{base_url}}/api/v1/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('Token returned', function () { pm.expect(json.token).to.exist; });",
+              "pm.collectionVariables.set('user1_token', json.token);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 - Auth: Login User 2 (Buyer)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"username\":\"{{user2_username}}\",\"password\":\"{{user2_password}}\"}"
+        },
+        "url": "{{base_url}}/api/v1/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('Token returned', function () { pm.expect(json.token).to.exist; });",
+              "pm.collectionVariables.set('user2_token', json.token);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 - Auth: Login Invalid Credentials - 401",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"username\":\"{{user1_username}}\",\"password\":\"wrongpassword\"}"
+        },
+        "url": "{{base_url}}/api/v1/login"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 401', function () { pm.response.to.have.status(401); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 - Profile: Create Profile User 1",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-User-Id", "value": "{{user1_id}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"Alice\",\"surname\":\"Seller\",\"city\":\"Moscow\",\"phone\":\"+79001110001\"}"
+        },
+        "url": "{{base_url}}/api/v1/profile"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 - Profile: Create Profile User 2",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-User-Id", "value": "{{user2_id}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"Bob\",\"surname\":\"Buyer\",\"city\":\"Moscow\",\"phone\":\"+79001110002\"}"
+        },
+        "url": "{{base_url}}/api/v1/profile"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 - Profile: Get Profile User 1",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-User-Id", "value": "{{user1_id}}" }],
+        "url": "{{base_url}}/api/v1/profile"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('Profile has name', function () { pm.expect(json.name).to.eql('Alice'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 - Profile: Update Profile User 1",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-User-Id", "value": "{{user1_id}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"name\":\"Alice Updated\",\"surname\":\"Seller\",\"city\":\"Saint Petersburg\"}"
+        },
+        "url": "{{base_url}}/api/v1/profile"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 - Profile: Get Profile Missing Auth - 401",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/profile"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 401', function () { pm.response.to.have.status(401); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 - Advert: List Categories",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/categories"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Returns array', function () { pm.expect(pm.response.json()).to.be.an('array'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 - Advert: List Brands",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/brands"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "19 - Advert: List Colors",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/colors"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "20 - Advert: Create Advert User 1",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-User-Id", "value": "{{user1_id}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\":\"E2E Test Jacket {{e2e_suffix}}\",\"description\":\"Warm winter jacket for e2e tests\",\"price\":7500,\"gender\":\"MALE\",\"condition\":1,\"size_letter\":\"M\",\"shipping_available\":true,\"brand\":{\"id\":\"4804dea0-64c2-4a3e-97cf-1037bf11163d\"},\"address_attributes\":{\"lat\":\"55.7558\",\"lon\":\"37.6173\",\"country\":\"Russia\",\"countrycode\":\"RU\",\"city\":\"Moscow\",\"street\":\"Tverskaya\",\"housenumber\":\"1\",\"postcode\":\"101000\"},\"pictures\":[{\"url\":\"https://picsum.photos/seed/jacket/400/600\",\"picture_order\":1}],\"colors\":[{\"color\":{\"id\":\"black\"},\"color_order\":1}],\"categories\":[{\"id\":\"000000\"}]}"
+        },
+        "url": "{{base_url}}/api/v1/adverts"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "pm.test('Advert id returned', function () { pm.expect(json.id).to.exist; });",
+              "pm.collectionVariables.set('advert_id', json.id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "21 - Advert: Create Advert Missing Auth - 401",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\":\"No Auth\"}"
+        },
+        "url": "{{base_url}}/api/v1/adverts"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 401', function () { pm.response.to.have.status(401); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "22 - Advert: Get Advert",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/adverts/{{advert_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('Advert title matches', function () { pm.expect(json.title).to.include('E2E Test Jacket'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "22a - Advert: Update Advert User 1",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-User-Id", "value": "{{user1_id}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\":\"E2E Test Jacket Updated {{e2e_suffix}}\",\"description\":\"Updated warm winter jacket for e2e tests\",\"price\":8000,\"gender\":\"MALE\",\"condition\":2,\"size_letter\":\"L\",\"shipping_available\":true,\"brand\":{\"id\":\"4804dea0-64c2-4a3e-97cf-1037bf11163d\"},\"address_attributes\":{\"lat\":\"55.7558\",\"lon\":\"37.6173\",\"country\":\"Russia\",\"countrycode\":\"RU\",\"city\":\"Moscow\",\"street\":\"Tverskaya\",\"housenumber\":\"1\",\"postcode\":\"101000\"},\"pictures\":[{\"url\":\"https://picsum.photos/seed/jacket-updated/400/600\",\"picture_order\":1}],\"colors\":[{\"color\":{\"id\":\"black\"},\"color_order\":1}],\"categories\":[{\"id\":\"000000\"}]}"
+        },
+        "url": "{{base_url}}/api/v1/adverts/{{advert_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('Advert id returned', function () { pm.expect(json.id).to.exist; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "22b - Advert: Get Updated Advert",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/adverts/{{advert_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('Advert title updated', function () { pm.expect(json.title).to.include('E2E Test Jacket Updated'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "22c - Advert: Update Advert Missing Auth - 401",
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\":\"No Auth Update\"}"
+        },
+        "url": "{{base_url}}/api/v1/adverts/{{advert_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 401', function () { pm.response.to.have.status(401); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "22d - Advert: Update Advert Other User - 403",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-User-Id", "value": "{{user2_id}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\":\"Hijack Attempt\",\"description\":\"Not my advert\",\"price\":1,\"gender\":\"MALE\",\"condition\":1,\"size_letter\":\"M\",\"shipping_available\":true,\"brand\":{\"id\":\"4804dea0-64c2-4a3e-97cf-1037bf11163d\"},\"address_attributes\":{\"lat\":\"55.7558\",\"lon\":\"37.6173\",\"country\":\"Russia\",\"countrycode\":\"RU\",\"city\":\"Moscow\",\"street\":\"Tverskaya\",\"housenumber\":\"1\",\"postcode\":\"101000\"},\"pictures\":[{\"url\":\"https://picsum.photos/seed/hijack/400/600\",\"picture_order\":1}],\"colors\":[{\"color\":{\"id\":\"black\"},\"color_order\":1}],\"categories\":[{\"id\":\"000000\"}]}"
+        },
+        "url": "{{base_url}}/api/v1/adverts/{{advert_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 403', function () { pm.response.to.have.status(403); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "22e - Advert: Update Advert Not Found - 404",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-User-Id", "value": "{{user1_id}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\":\"Ghost Update\",\"description\":\"Missing advert\",\"price\":1,\"gender\":\"MALE\",\"condition\":1,\"size_letter\":\"M\",\"shipping_available\":true,\"brand\":{\"id\":\"4804dea0-64c2-4a3e-97cf-1037bf11163d\"},\"address_attributes\":{\"lat\":\"55.7558\",\"lon\":\"37.6173\",\"country\":\"Russia\",\"countrycode\":\"RU\",\"city\":\"Moscow\",\"street\":\"Tverskaya\",\"housenumber\":\"1\",\"postcode\":\"101000\"},\"pictures\":[{\"url\":\"https://picsum.photos/seed/ghost/400/600\",\"picture_order\":1}],\"colors\":[{\"color\":{\"id\":\"black\"},\"color_order\":1}],\"categories\":[{\"id\":\"000000\"}]}"
+        },
+        "url": "{{base_url}}/api/v1/adverts/00000000-0000-0000-0000-000000000000"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 404', function () { pm.response.to.have.status(404); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "23 - Advert: Get Advert Not Found - 404",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/adverts/00000000-0000-0000-0000-000000000000"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 404', function () { pm.response.to.have.status(404); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "26 - Dialog: User 2 Sends Message To User 1",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-User-Id", "value": "{{user2_id}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"text\":\"Hi, is the jacket still available?\"}"
+        },
+        "url": "{{base_url}}/api/v1/dialog/{{user1_id}}/send"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "27 - Dialog: User 1 Lists Dialog With User 2",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-User-Id", "value": "{{user1_id}}" }],
+        "url": "{{base_url}}/api/v1/dialog/{{user2_id}}/list"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "28 - Dialog: User 1 Lists Conversations",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-User-Id", "value": "{{user1_id}}" }],
+        "url": "{{base_url}}/api/v1/conversations"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "28a - Search: Get Advert By ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/search/{{advert_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var expected = 200;",
+              "var interval = Number(pm.collectionVariables.get('poll_interval_ms')) || 2000;",
+              "var timeout = Number(pm.collectionVariables.get('poll_timeout_ms')) || 20000;",
+              "var maxRetries = Math.max(1, Math.ceil(timeout / interval));",
+              "var retries = 0;",
+              "var advertId = pm.collectionVariables.get('advert_id');",
+              "function poll() {",
+              "    pm.sendRequest(pm.request.url.toString(), function (err, res) {",
+              "        var code = res ? res.code : null;",
+              "        if (!err && code === expected) {",
+              "            pm.test('Status code is 200', function () { pm.expect(code).to.eql(expected); });",
+              "            var json = res.json();",
+              "            pm.test('Advert id matches', function () { pm.expect(json.id).to.eql(advertId); });",
+              "            pm.test('Advert title includes jacket', function () { pm.expect(json.title).to.include('E2E Test Jacket'); });",
+              "            return;",
+              "        }",
+              "        retries++;",
+              "        if (retries < maxRetries) {",
+              "            setTimeout(poll, interval);",
+              "            return;",
+              "        }",
+              "        var last = res ? res.code : (err ? err.message : 'no response');",
+              "        pm.test('Status code is 200', function () { pm.expect(code).to.eql(expected, 'Timed out waiting for 200 after ' + (maxRetries * interval / 1000) + 's. Last status: ' + last); });",
+              "    });",
+              "}",
+              "setTimeout(poll, interval);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "28b - Search: Search Adverts",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/search?q=jacket"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var expected = 200;",
+              "var interval = Number(pm.collectionVariables.get('poll_interval_ms')) || 2000;",
+              "var timeout = Number(pm.collectionVariables.get('poll_timeout_ms')) || 20000;",
+              "var maxRetries = Math.max(1, Math.ceil(timeout / interval));",
+              "var retries = 0;",
+              "var advertId = pm.collectionVariables.get('advert_id');",
+              "function poll() {",
+              "    pm.sendRequest(pm.request.url.toString(), function (err, res) {",
+              "        var code = res ? res.code : null;",
+              "        if (!err && code === expected) {",
+              "            pm.test('Status code is 200', function () { pm.expect(code).to.eql(expected); });",
+              "            var results = res.json();",
+              "            var found = results && Array.isArray(results.items) && results.items.some(function(item) { return item.id === advertId; });",
+              "            pm.test('Advert found in search results', function () { pm.expect(found).to.be.true; });",
+              "            return;",
+              "        }",
+              "        retries++;",
+              "        if (retries < maxRetries) {",
+              "            setTimeout(poll, interval);",
+              "            return;",
+              "        }",
+              "        var last = res ? res.code : (err ? err.message : 'no response');",
+              "        pm.test('Status code is 200', function () { pm.expect(code).to.eql(expected, 'Timed out waiting for 200 after ' + (maxRetries * interval / 1000) + 's. Last status: ' + last); });",
+              "    });",
+              "}",
+              "setTimeout(poll, interval);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "29 - Order: User 2 Creates Order",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-User-Id", "value": "{{user2_id}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"advert_id\":\"{{advert_id}}\"}"
+        },
+        "url": "{{base_url}}/api/v1/order"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 201', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "pm.test('Order id returned', function () { pm.expect(json.id).to.exist; });",
+              "pm.collectionVariables.set('order_id', json.id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "30 - Order: Get Order",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-User-Id", "value": "{{user2_id}}" }],
+        "url": "{{base_url}}/api/v1/order/{{order_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "31 - Order: List Orders User 2",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-User-Id", "value": "{{user2_id}}" }],
+        "url": "{{base_url}}/api/v1/order"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "32 - Delivery: Get Providers",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/providers?weight=5000",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "providers"],
+          "query": [{ "key": "weight", "value": "5000" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "var providers = pm.response.json();",
+              "pm.test('Providers array', function () { pm.expect(providers).to.be.an('array'); });",
+              "if (providers.length > 0) { pm.collectionVariables.set('provider_id', providers[0].id.toString()); }"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "33 - Order: Set Delivery",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-User-Id", "value": "{{user2_id}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"provider_id\":{{provider_id}},\"to\":{\"city\":\"Moscow\",\"address\":\"Lenina 1\",\"zip\":\"123456\"}}"
+        },
+        "url": "{{base_url}}/api/v1/order/{{order_id}}/delivery"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "37 - Order: Pay Order",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "X-User-Id", "value": "{{user2_id}}" }
+        ],
+        "url": "{{base_url}}/api/v1/order/{{order_id}}/pay"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 202', function () { pm.response.to.have.status(202); });",
+              "var json = pm.response.json();",
+              "pm.test('Transaction id returned', function () { pm.expect(json.transaction_id).to.exist; });",
+              "pm.collectionVariables.set('transaction_id', json.transaction_id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "38 - Billing: Get Transaction",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-User-Id", "value": "{{user2_id}}" }],
+        "url": "{{base_url}}/api/v1/transaction/{{transaction_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "39 - Billing: Confirm Transaction Success",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "X-User-Id", "value": "{{user2_id}}" }],
+        "url": {
+          "raw": "{{base_url}}/api/v1/transaction/{{transaction_id}}/confirm?success=true",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "transaction", "{{transaction_id}}", "confirm"],
+          "query": [{ "key": "success", "value": "true" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "40 - Billing: Get Transaction Not Found - 404",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-User-Id", "value": "{{user2_id}}" }],
+        "url": "{{base_url}}/api/v1/transaction/00000000-0000-0000-0000-000000000000"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 404', function () { pm.response.to.have.status(404); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "41 - Delivery: Get Delivery",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/delivery/{{order_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var expected = 200;",
+              "var interval = Number(pm.collectionVariables.get('poll_interval_ms')) || 2000;",
+              "var timeout = Number(pm.collectionVariables.get('poll_timeout_ms')) || 20000;",
+              "var maxRetries = Math.max(1, Math.ceil(timeout / interval));",
+              "var retries = 0;",
+              "function poll() {",
+              "    pm.sendRequest(pm.request.url.toString(), function (err, res) {",
+              "        var code = res ? res.code : null;",
+              "        if (!err && code === expected) {",
+              "            pm.test('Status code is 200', function () { pm.expect(code).to.eql(expected); });",
+              "            return;",
+              "        }",
+              "        retries++;",
+              "        if (retries < maxRetries) {",
+              "            setTimeout(poll, interval);",
+              "            return;",
+              "        }",
+              "        var last = res ? res.code : (err ? err.message : 'no response');",
+              "        pm.test('Status code is 200', function () { pm.expect(code).to.eql(expected, 'Timed out waiting for 200 after ' + (maxRetries * interval / 1000) + 's. Last status: ' + last); });",
+              "    });",
+              "}",
+              "setTimeout(poll, interval);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "42 - Delivery: Get Delivery Not Found - 404",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/delivery/00000000-0000-0000-0000-000000000000"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 404', function () { pm.response.to.have.status(404); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "43 - Delivery: Get Delivery Invalid ID - 400",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/delivery/invalid-uuid"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 400', function () { pm.response.to.have.status(400); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "44 - Notifications: List Notifications User 1",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-User-Id", "value": "{{user1_id}}" }],
+        "url": "{{base_url}}/api/v1/notifications"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "45 - Notifications: List Notifications User 2",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "X-User-Id", "value": "{{user2_id}}" }],
+        "url": "{{base_url}}/api/v1/notifications"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "46 - Notifications: Missing Auth - 400",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/notifications"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 400', function () { pm.response.to.have.status(400); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "47 - BFF: Get Advert Full",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/bff/adverts/{{advert_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "48 - BFF: Get Order Full",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/bff/orders/{{order_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var expected = 200;",
+              "var interval = Number(pm.collectionVariables.get('bff_poll_interval_ms')) || 3000;",
+              "var timeout = Number(pm.collectionVariables.get('bff_poll_timeout_ms')) || 30000;",
+              "var maxRetries = Math.max(1, Math.ceil(timeout / interval));",
+              "var retries = 0;",
+              "function poll() {",
+              "    pm.sendRequest(pm.request.url.toString(), function (err, res) {",
+              "        var code = res ? res.code : null;",
+              "        if (!err && code === expected) {",
+              "            pm.test('Status code is 200', function () { pm.expect(code).to.eql(expected); });",
+              "            return;",
+              "        }",
+              "        retries++;",
+              "        if (retries < maxRetries) {",
+              "            setTimeout(poll, interval);",
+              "            return;",
+              "        }",
+              "        var last = res ? res.code : (err ? err.message : 'no response');",
+              "        pm.test('Status code is 200', function () { pm.expect(code).to.eql(expected, 'Timed out waiting for 200 after ' + (maxRetries * interval / 1000) + 's. Last status: ' + last); });",
+              "    });",
+              "}",
+              "setTimeout(poll, interval);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "49 - BFF: Get User Cabinet User 1",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/bff/users/{{user1_id}}/cabinet"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    },
+    {
+      "name": "50 - BFF: Get Advert Full Not Found - 404",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/v1/bff/adverts/00000000-0000-0000-0000-000000000000"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var expected = 404;",
+              "var interval = Number(pm.collectionVariables.get('bff_poll_interval_ms')) || 3000;",
+              "var timeout = Number(pm.collectionVariables.get('bff_poll_timeout_ms')) || 30000;",
+              "var maxRetries = Math.max(1, Math.ceil(timeout / interval));",
+              "var retries = 0;",
+              "function poll() {",
+              "    pm.sendRequest(pm.request.url.toString(), function (err, res) {",
+              "        var code = res ? res.code : null;",
+              "        if (!err && code === expected) {",
+              "            pm.test('Status code is 404', function () { pm.expect(code).to.eql(expected); });",
+              "            return;",
+              "        }",
+              "        retries++;",
+              "        if (retries < maxRetries) {",
+              "            setTimeout(poll, interval);",
+              "            return;",
+              "        }",
+              "        var last = res ? res.code : (err ? err.message : 'no response');",
+              "        pm.test('Status code is 404', function () { pm.expect(code).to.eql(expected, 'Timed out waiting for 404 after ' + (maxRetries * interval / 1000) + 's. Last status: ' + last); });",
+              "    });",
+              "}",
+              "setTimeout(poll, interval);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ]
+    }
+  ]
+}

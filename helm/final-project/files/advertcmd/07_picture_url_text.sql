@@ -1,0 +1,2 @@
+ALTER TABLE pictures 
+ALTER COLUMN url TYPE text;

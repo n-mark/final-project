@@ -1,0 +1,87 @@
+{{- if .Values.postInstallRestart.enabled }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: post-install-restart
+  namespace: {{ .Values.namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: post-install-restart
+  namespace: {{ .Values.namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: post-install-restart
+  namespace: {{ .Values.namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: post-install-restart
+subjects:
+  - kind: ServiceAccount
+    name: post-install-restart
+    namespace: {{ .Values.namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: post-install-restart
+  namespace: {{ .Values.namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "20"
+    helm.sh/hook-delete-policy: hook-succeeded
+spec:
+  template:
+    spec:
+      serviceAccountName: post-install-restart
+      restartPolicy: Never
+      containers:
+        - name: restart
+          image: curlimages/curl:8.9.1
+          command:
+            - sh
+            - -c
+            - |
+              NAMESPACE={{ .Values.namespace }}
+              TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+              CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+              APISERVER=https://kubernetes.default.svc
+
+              echo "Waiting 30s for all pods to stabilise..."
+              sleep 30
+
+              echo "Restarting Kafka-dependent services..."
+              for svc in profile-service order-service billing-service notification-service delivery-service advert-cmd-svc advert-validation-svc advert-postprocessor; do
+                echo "  -> restarting $svc..."
+                curl -sS --cacert "$CACERT" -H "Authorization: Bearer $TOKEN" \
+                  -H "Content-Type: application/strategic-merge-patch+json" \
+                  -X PATCH \
+                  "$APISERVER/apis/apps/v1/namespaces/$NAMESPACE/deployments/$svc" \
+                  -d "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}}}}}" >/dev/null
+              done
+
+              echo "All services restarted. Waiting 60s for pods to become ready..."
+              sleep 60
+              echo "Done."
+{{- end }}

@@ -1,0 +1,98 @@
+{{- range $db := .Values.databases }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $db.name }}-config
+  namespace: {{ $.Values.namespace }}
+data:
+  POSTGRES_USER: {{ $db.user | quote }}
+  POSTGRES_DB: {{ $db.db | quote }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $db.name }}-secret
+  namespace: {{ $.Values.namespace }}
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: {{ $db.password | quote }}
+{{- range $path, $_ := $.Files.Glob (printf "files/%s/*.sql" $db.filesDir) }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $db.name }}-init-{{ base $path | trimSuffix ".sql" | replace "." "-" | replace "_" "-" }}
+  namespace: {{ $.Values.namespace }}
+data:
+  {{ base $path }}: |-
+{{ $.Files.Get $path | indent 4 }}
+{{- end }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $db.name }}-pvc
+  namespace: {{ $.Values.namespace }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: {{ $db.storage }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $db.name }}
+  namespace: {{ $.Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $db.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $db.name }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ $db.image | default "postgres:16-alpine" }}
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: {{ $db.name }}-config
+            - secretRef:
+                name: {{ $db.name }}-secret
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+{{- range $path, $_ := $.Files.Glob (printf "files/%s/*.sql" $db.filesDir) }}
+            - name: init-{{ base $path | trimSuffix ".sql" | replace "." "-" | replace "_" "-" }}
+              mountPath: /docker-entrypoint-initdb.d/{{ base $path }}
+              subPath: {{ base $path }}
+{{- end }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ $db.name }}-pvc
+{{- range $path, $_ := $.Files.Glob (printf "files/%s/*.sql" $db.filesDir) }}
+        - name: init-{{ base $path | trimSuffix ".sql" | replace "." "-" | replace "_" "-" }}
+          configMap:
+            name: {{ $db.name }}-init-{{ base $path | trimSuffix ".sql" | replace "." "-" | replace "_" "-" }}
+            optional: true
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $db.name }}
+  namespace: {{ $.Values.namespace }}
+spec:
+  selector:
+    app: {{ $db.name }}
+  ports:
+    - port: 5432
+      targetPort: 5432
+{{- end }}

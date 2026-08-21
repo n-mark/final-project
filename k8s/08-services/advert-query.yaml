@@ -5,9 +5,9 @@ metadata:
   name: advert-query-config
   namespace: final-proj
 data:
-  APP_PORT: "8080"
-  OPENSEARCH_URL: "http://opensearch:9200"
-  ADVERT_INDEX: "adverts-*"
+  PORT: "8080"
+  OPENSEARCH_ADDRESS: "http://opensearch:9200"
+  OPENSEARCH_INDEX: "adverts"
 ---
 apiVersion: apps/v1
 kind: Deployment

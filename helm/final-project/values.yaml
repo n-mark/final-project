@@ -1,12 +1,15 @@
 namespace: final-proj
 
 image:
-  registry: docker.io
+  registry: mblkuta
   tag: finalproj-latest
   pullPolicy: Always
 
 replicas:
   default: 1
+
+postInstallRestart:
+  enabled: true
 
 resources:
   requests:
@@ -16,62 +19,364 @@ resources:
     cpu: "200m"
     memory: "128Mi"
 
-postgres:
-  enabled: true
-  storage: 1Gi
+# PostgreSQL instances. Each entry maps to ConfigMap + Secret + PVC + Deployment + Service.
+# `filesDir` points to helm/final-project/files/<dir>/*.sql and is mounted into
+# /docker-entrypoint-initdb.d on first boot (fresh PVC).
+databases:
+  - name: postgres-shared
+    db: usersdb
+    user: postgres
+    password: postgres_password
+    storage: 2Gi
+    filesDir: auth
+  - name: postgres-profiles
+    db: profiledb
+    user: profile_user
+    password: profile_password
+    storage: 1Gi
+    filesDir: profile
+  - name: postgres-orders
+    db: orderdb
+    user: order_user
+    password: order_password
+    storage: 1Gi
+    filesDir: order
+  - name: postgres-billing
+    db: billingdb
+    user: billing_user
+    password: billing_password
+    storage: 1Gi
+    filesDir: billing
+  - name: postgres-notifications
+    db: notificationdb
+    user: notification_user
+    password: notification_password
+    storage: 1Gi
+    filesDir: notification
+  - name: postgres-delivery
+    db: deliverydb
+    user: delivery_user
+    password: delivery_password
+    storage: 1Gi
+    filesDir: delivery
+  - name: postgres-advertcmd
+    db: advertcmddb
+    user: advertcmd_user
+    password: advertcmd_password
+    storage: 1Gi
+    filesDir: advertcmd
+  - name: postgres-dialog
+    db: dialogdb
+    user: dialog_user
+    password: dialog_password
+    storage: 1Gi
+    filesDir: dialog
+  - name: postgres-validation
+    db: validationdb
+    user: validation_user
+    password: validation_password
+    storage: 1Gi
+    filesDir: validation
+  - name: postgres-gis
+    db: gis
+    user: gis_user
+    password: gis_password
+    image: postgis/postgis:16-3.4-alpine
+    storage: 1Gi
+    filesDir: gis
 
 kafka:
   enabled: true
-  replicas: 3
-  storage: 2Gi
+  fullnameOverride: kafka
+  # Fixed KRaft cluster ID (valid 22-char). Avoids the Bitnami chart trying
+  # to read a pre-existing `kafka-kraft` secret on upgrade.
+  clusterId: "5L6g3nShT-eMCtK--X86sg"
+  image:
+    # Bitnami relocated Kafka images off the `bitnami/` org on Docker Hub;
+    # the chart default `bitnami/kafka` no longer resolves.
+    registry: docker.io
+    repository: bitnamilegacy/kafka
+    tag: 4.0.0-debian-12-r10
+  # KRaft controller+broker nodes (no Zookeeper). The chart's headless
+  # service + per-pod advertised listeners fix the quorum/DNS issues that
+  # previously crashed the bespoke StatefulSet.
+  controller:
+    replicaCount: 3
+    controllerOnly: false
+    persistence:
+      size: 2Gi
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        cpu: "1"
+        memory: "1Gi"
+  # The app services connect to `kafka:9092` without credentials, so every
+  # listener must be PLAINTEXT (chart default is SASL_PLAINTEXT).
+  listeners:
+    client:
+      protocol: PLAINTEXT
+    controller:
+      protocol: PLAINTEXT
+    interbroker:
+      protocol: PLAINTEXT
+
+redis:
+  enabled: true
+  storage: 1Gi
+  image: redis:7-alpine
 
 opensearch:
   enabled: true
   replicas: 3
   storage: 5Gi
-
-redis:
-  enabled: true
-  storage: 1Gi
-
-services:
-  auth:
-    image: auth-service
-    port: 8080
-  profile:
-    image: profile-service
-    port: 8080
-  order:
-    image: ordersvc
-    port: 8080
-  billing:
-    image: billingsvc
-    port: 8080
-  notification:
-    image: notificationsvc
-    port: 8080
-  delivery:
-    image: delivery-service
-    port: 8080
-  dialog:
-    image: dialog-svc
-    port: 8080
-  advertCmd:
-    image: advert-cmd-svc
-    port: 8080
-  advertQuery:
-    image: advert-query
-    port: 8080
-  advertValidation:
-    image: advert-validation-svc
-    port: 8080
-  advertPostprocessor:
-    image: advert-postprocessor
-    port: 8080
-  bff:
-    image: advert-proj-bff
-    port: 8080
+  image: opensearchproject/opensearch:2.14.0
+  index: adverts
 
 traefik:
   enabled: true
   host: finalproj.local
+  image: traefik:v3.0
+
+# Per-service environment (ConfigMap) and secret stringData.
+services:
+  auth:
+    name: auth-service
+    image: auth-service
+    port: 8080
+    probePath: /health
+    waitForPg: postgres-shared
+    env:
+      APP_PORT: ":8080"
+      DB_HOST: "postgres-shared"
+      DB_PORT: "5432"
+      DB_NAME: "usersdb"
+      DB_MAX_RETRIES: "30"
+      DB_RETRY_INTERVAL: "3"
+      BROKER_TYPE: "KAFKA"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_AUTH_TOPIC: "auth"
+      KAFKA_USER_CREATED_EVENT_TYPE: "user.created"
+    secretData:
+      DB_USER: "postgres"
+      DB_PASSWORD: "postgres_password"
+      JWT_SECRET: "changeme_super_secret_jwt_key_please_rotate"
+
+  profile:
+    name: profile-service
+    image: profile-service
+    port: 8080
+    probePath: /metrics
+    waitForPg: postgres-profiles
+    waitForKafka: true
+    env:
+      SERVER_ADDR: ":8080"
+      BROKER_TYPE: "KAFKA"
+      DB_HOST: "postgres-profiles"
+      DB_PORT: "5432"
+      DB_NAME: "profiledb"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_PROFILE_TOPIC: "profile"
+      KAFKA_BILLING_TOPIC: "billing"
+      KAFKA_BILLING_GROUP: "profilesvc.billing"
+      KAFKA_PROFILE_CREATED_EVENT_TYPE: "profile.created"
+      KAFKA_BILLING_ACCOUNT_CREATED_EVENT_TYPE: "billing.account.created"
+      BILLING_URL: "http://billing-service:8080"
+    secretData:
+      DB_USER: "profile_user"
+      DB_PASSWORD: "profile_password"
+
+  order:
+    name: order-service
+    image: ordersvc
+    port: 8080
+    probePath: /health
+    waitForPg: postgres-orders
+    waitForKafka: true
+    env:
+      APP_PORT: "8080"
+      BROKER_TYPE: "KAFKA"
+      PG_HOST: "postgres-orders"
+      PG_PORT: "5432"
+      PG_DATABASE: "orderdb"
+      PG_SSLMODE: "disable"
+      KAFKA_BROKERS: "kafka:9092"
+      ADVERT_CMD_URL: "http://advert-cmd-svc:8080"
+      BILLING_URL: "http://billing-service:8080"
+      DELIVERY_URL: "http://delivery-service:8080"
+    secretData:
+      PG_USER: "order_user"
+      PG_PASSWORD: "order_password"
+
+  billing:
+    name: billing-service
+    image: billingsvc
+    port: 8080
+    probePath: /health
+    waitForPg: postgres-billing
+    waitForKafka: true
+    env:
+      APP_PORT: "8080"
+      BROKER_TYPE: "KAFKA"
+      PG_HOST: "postgres-billing"
+      PG_PORT: "5432"
+      PG_DATABASE: "billingdb"
+      PG_SSLMODE: "disable"
+      KAFKA_BROKERS: "kafka:9092"
+    secretData:
+      PG_USER: "billing_user"
+      PG_PASSWORD: "billing_password"
+
+  notification:
+    name: notification-service
+    image: notificationsvc
+    port: 8080
+    probePath: /health
+    waitForPg: postgres-notifications
+    waitForKafka: true
+    env:
+      APP_PORT: "8080"
+      BROKER_TYPE: "KAFKA"
+      PG_HOST: "postgres-notifications"
+      PG_PORT: "5432"
+      PG_DATABASE: "notificationdb"
+      PG_SSLMODE: "disable"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_BILLING_TOPIC: "order-payment"
+      KAFKA_BILLING_GROUP: "notificationsvc.billing"
+      KAFKA_BILLING_EVENT_TYPES: "PAYMENT_SUCCESS,PAYMENT_FAILED"
+      KAFKA_AUTH_TOPIC: "auth"
+      KAFKA_AUTH_GROUP: "notificationsvc.auth"
+      KAFKA_AUTH_EVENT_TYPES: "user.created"
+    secretData:
+      PG_USER: "notification_user"
+      PG_PASSWORD: "notification_password"
+
+  delivery:
+    name: delivery-service
+    image: delivery-service
+    port: 8080
+    probePath: /health
+    waitForPg: postgres-delivery
+    waitForKafka: true
+    env:
+      APP_PORT: "8080"
+      BROKER_TYPE: "KAFKA"
+      PG_HOST: "postgres-delivery"
+      PG_PORT: "5432"
+      PG_DATABASE: "deliverydb"
+      PG_SSLMODE: "disable"
+      KAFKA_BROKERS: "kafka:9092"
+      KAFKA_ORDER_TOPIC: "order"
+      KAFKA_ORDER_GROUP: "delivery.order"
+      KAFKA_DELIVERY_TOPIC: "delivery"
+    secretData:
+      PG_USER: "delivery_user"
+      PG_PASSWORD: "delivery_password"
+
+  dialog:
+    name: dialog-service
+    image: dialog-svc
+    port: 8080
+    probePath: /health
+    waitForPg: postgres-dialog
+    env:
+      SERVER_ADDR: ":8080"
+      CITUS_HOST: "postgres-dialog"
+      CITUS_PORT: "5432"
+      CITUS_DB: "dialogdb"
+      REDIS_ADDR: "redis:6379"
+      BROADCAST_TYPE: "redis"
+    secretData:
+      CITUS_USER: "dialog_user"
+      CITUS_PASSWORD: "dialog_password"
+
+  advertCmd:
+    name: advert-cmd-svc
+    image: advert-cmd-svc
+    port: 8080
+    probePath: /healthz
+    waitForPg: postgres-advertcmd
+    waitForKafka: true
+    env:
+      HTTP_ADDR: ":8080"
+      BROKER_TYPE: "KAFKA"
+      KAFKA_BROKERS: "kafka:9092"
+      VALIDATION_TOPIC: "pending-queue"
+      POST_VALIDATION_TOPIC: "post-validation"
+      VALIDATION_GROUP_ID: "advert-cmd-svc-validation"
+      OUTBOX_INTERVAL: "1s"
+      OUTBOX_BATCH_SIZE: "100"
+      LOG_LEVEL: "info"
+    secretData:
+      DATABASE_URL: "postgres://advertcmd_user:advertcmd_password@postgres-advertcmd:5432/advertcmddb?sslmode=disable"
+
+  advertQuery:
+    name: advert-query
+    image: advert-query
+    port: 8080
+    probePath: /metrics
+    env:
+      PORT: "8080"
+      OPENSEARCH_ADDRESS: "http://opensearch:9200"
+      OPENSEARCH_INDEX: "adverts"
+
+  advertValidation:
+    name: advert-validation-svc
+    image: advert-validation-svc
+    port: 8080
+    probePath: /healthz
+    waitForPg: postgres-validation
+    waitForKafka: true
+    env:
+      HTTP_ADDR: ":8080"
+      KAFKA_BOOTSTRAP_SERVER: "kafka:9092"
+      KAFKA_GROUP_ID: "validation-svc"
+      PENDING_TOPIC: "pending-queue"
+      POST_VALIDATION_TOPIC: "post-validation"
+      MOCK_LLM: "true"
+      MOCK_AUTO_APPROVE: "true"
+      WORKER_COUNT: "4"
+      CLAIM_BATCH_SIZE: "10"
+      POLL_INTERVAL: "2s"
+      LEASE_TIMEOUT: "5m"
+      MAX_ATTEMPTS: "3"
+      HYBRID_CONFIDENCE_THRESHOLD: "0.8"
+    secretData:
+      DATABASE_URL: "postgres://validation_user:validation_password@postgres-validation:5432/validationdb?sslmode=disable"
+
+  advertPostprocessor:
+    name: advert-postprocessor
+    image: advert-postprocessor
+    port: 9090
+    probePath: /metrics
+    waitForPg: postgres-gis
+    waitForKafka: true
+    env:
+      BROKER_TYPE: "KAFKA"
+      KAFKA_BROKERS: "kafka:9092"
+      POST_VALIDATION_TOPIC: "post-validation"
+      CONSUMER_GROUP_ID: "advert-postprocessor"
+      ADVERT_SERVICE_URL: "http://advert-cmd-svc:8080"
+      GIS_DATABASE_URL: "postgres://gis_user:gis_password@postgres-gis:5432/gis?sslmode=disable"
+      OPENSEARCH_URL: "http://opensearch:9200"
+      OPENSEARCH_INDEX: "adverts"
+      EMBEDDINGS_ENABLED: "false"
+      METRICS_ADDR: ":9090"
+
+  bff:
+    name: advert-proj-bff
+    image: advert-proj-bff
+    port: 8080
+    probePath: /health
+    env:
+      APP_PORT: "8080"
+      AUTH_URL: "http://auth-service:8080"
+      PROFILE_URL: "http://profile-service:8080"
+      ADVERT_CMD_URL: "http://advert-cmd-svc:8080"
+      ADVERT_QUERY_URL: "http://advert-query:8080"
+      ORDER_URL: "http://order-service:8080"
+      BILLING_URL: "http://billing-service:8080"
+      DELIVERY_URL: "http://delivery-service:8080"
+      DIALOG_URL: "http://dialog-service:8080"

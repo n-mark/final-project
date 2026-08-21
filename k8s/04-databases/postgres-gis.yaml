@@ -1,0 +1,80 @@
+---
+# PostGIS database used by advert-postprocessor for geo enrichment (subway lookup).
+# Note: the subway seed schema lives in ../advert-postprocessor/db_init/*.sql and is
+# not auto-applied here (consistent with the other databases in this repo).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-gis-config
+  namespace: final-proj
+data:
+  POSTGRES_USER: "gis_user"
+  POSTGRES_DB: "gis"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-gis-secret
+  namespace: final-proj
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: "gis_password"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-gis-pvc
+  namespace: final-proj
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-gis
+  namespace: final-proj
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-gis
+  template:
+    metadata:
+      labels:
+        app: postgres-gis
+    spec:
+      containers:
+        - name: postgres
+          image: postgis/postgis:16-3.4-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: postgres-gis-config
+            - secretRef:
+                name: postgres-gis-secret
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-gis-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-gis
+  namespace: final-proj
+spec:
+  selector:
+    app: postgres-gis
+  ports:
+    - port: 5432
+      targetPort: 5432

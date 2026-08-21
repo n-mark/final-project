@@ -5,12 +5,18 @@ metadata:
   name: profile-service-config
   namespace: final-proj
 data:
-  APP_PORT: "8080"
-  PG_HOST: "postgres-profiles"
-  PG_PORT: "5432"
-  PG_DATABASE: "profiledb"
-  PG_SSLMODE: "disable"
+  SERVER_ADDR: ":8080"
+  BROKER_TYPE: "KAFKA"
+  DB_HOST: "postgres-profiles"
+  DB_PORT: "5432"
+  DB_NAME: "profiledb"
   KAFKA_BROKERS: "kafka:9092"
+  KAFKA_PROFILE_TOPIC: "profile"
+  KAFKA_BILLING_TOPIC: "billing"
+  KAFKA_BILLING_GROUP: "profilesvc.billing"
+  KAFKA_PROFILE_CREATED_EVENT_TYPE: "profile.created"
+  KAFKA_BILLING_ACCOUNT_CREATED_EVENT_TYPE: "billing.account.created"
+  BILLING_URL: "http://billing-service:8080"
 ---
 apiVersion: v1
 kind: Secret
@@ -19,8 +25,8 @@ metadata:
   namespace: final-proj
 type: Opaque
 stringData:
-  PG_USER: "profile_user"
-  PG_PASSWORD: "profile_password"
+  DB_USER: "profile_user"
+  DB_PASSWORD: "profile_password"
 ---
 apiVersion: apps/v1
 kind: Deployment

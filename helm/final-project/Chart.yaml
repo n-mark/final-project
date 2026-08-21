@@ -4,3 +4,9 @@ description: Helm chart for the final advert project microservices stack
 type: application
 version: 0.1.0
 appVersion: "1.0.0"
+
+dependencies:
+  - name: kafka
+    version: "32.4.3"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: kafka.enabled

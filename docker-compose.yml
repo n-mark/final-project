@@ -1,0 +1,776 @@
+name: final-project
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  networks:
+    - finalproj-net
+
+services:
+  # ============================================================
+  # INFRASTRUCTURE
+  # ============================================================
+
+  # --- Traefik (reverse proxy / API gateway) ---
+  traefik:
+    <<: *service-defaults
+    image: traefik:v3.0
+    container_name: traefik
+    command:
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --ping=true
+    ports:
+      - "80:80"
+      - "8080:8080"   # dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Prometheus ---
+  prometheus:
+    <<: *service-defaults
+    image: prom/prometheus:v3.0.0
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+      - --web.enable-lifecycle
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:9090/-/healthy || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # --- Kafka (KRaft single broker) ---
+  kafka:
+    <<: *service-defaults
+    image: apache/kafka:3.7.0
+    container_name: kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: "finalproj-kafka-cluster-01"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+
+  # --- Redis ---
+  redis:
+    <<: *service-defaults
+    image: redis:7-alpine
+    container_name: redis
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # --- OpenSearch (single node) ---
+  opensearch:
+    <<: *service-defaults
+    image: opensearchproject/opensearch:2.14.0
+    container_name: opensearch
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - DISABLE_SECURITY_PLUGIN=true
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+  # ============================================================
+  # DATABASES (PostgreSQL per service)
+  # ============================================================
+
+  postgres-shared:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: postgres-shared
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_password
+      POSTGRES_DB: usersdb
+    volumes:
+      - pg-shared-data:/var/lib/postgresql/data
+      - ../auth-service/init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d usersdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-profiles:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: postgres-profiles
+    environment:
+      POSTGRES_USER: profile_user
+      POSTGRES_PASSWORD: profile_password
+      POSTGRES_DB: profiledb
+    volumes:
+      - pg-profiles-data:/var/lib/postgresql/data
+      - ../profile-service/db/init/001_schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U profile_user -d profiledb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-orders:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: postgres-orders
+    environment:
+      POSTGRES_USER: order_user
+      POSTGRES_PASSWORD: order_password
+      POSTGRES_DB: orderdb
+    volumes:
+      - pg-orders-data:/var/lib/postgresql/data
+      - ../order-svc/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U order_user -d orderdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-billing:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: postgres-billing
+    environment:
+      POSTGRES_USER: billing_user
+      POSTGRES_PASSWORD: billing_password
+      POSTGRES_DB: billingdb
+    volumes:
+      - pg-billing-data:/var/lib/postgresql/data
+      - ../billing-svc/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U billing_user -d billingdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-notifications:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: postgres-notifications
+    environment:
+      POSTGRES_USER: notification_user
+      POSTGRES_PASSWORD: notification_password
+      POSTGRES_DB: notificationdb
+    volumes:
+      - pg-notifications-data:/var/lib/postgresql/data
+      - ../notification-svc/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notification_user -d notificationdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-delivery:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: postgres-delivery
+    environment:
+      POSTGRES_USER: delivery_user
+      POSTGRES_PASSWORD: delivery_password
+      POSTGRES_DB: deliverydb
+    volumes:
+      - pg-delivery-data:/var/lib/postgresql/data
+      - ../delivery-service/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U delivery_user -d deliverydb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-advertcmd:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: postgres-advertcmd
+    environment:
+      POSTGRES_USER: advertcmd_user
+      POSTGRES_PASSWORD: advertcmd_password
+      POSTGRES_DB: advertcmddb
+    volumes:
+      - pg-advertcmd-data:/var/lib/postgresql/data
+      - ../advert-cmd-svc/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U advertcmd_user -d advertcmddb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-dialog:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: postgres-dialog
+    environment:
+      POSTGRES_USER: dialog_user
+      POSTGRES_PASSWORD: dialog_password
+      POSTGRES_DB: dialogdb
+    volumes:
+      - pg-dialog-data:/var/lib/postgresql/data
+      - ../dialog-svc/db/init/init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dialog_user -d dialogdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  postgres-validation:
+    <<: *service-defaults
+    image: postgres:16-alpine
+    container_name: postgres-validation
+    environment:
+      POSTGRES_USER: validation_user
+      POSTGRES_PASSWORD: validation_password
+      POSTGRES_DB: validationdb
+    volumes:
+      - pg-validation-data:/var/lib/postgresql/data
+      - ../advert-validation-svc/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U validation_user -d validationdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # PostGIS database (subway enrichment) used by advert-postprocessor.
+  postgres-gis:
+    <<: *service-defaults
+    image: postgis/postgis:16-3.4-alpine
+    container_name: postgres-gis
+    environment:
+      POSTGRES_USER: gis_user
+      POSTGRES_PASSWORD: gis_password
+      POSTGRES_DB: gis
+    volumes:
+      - pg-gis-data:/var/lib/postgresql/data
+      - ../advert-postprocessor/db_init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gis_user -d gis"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ============================================================
+  # APPLICATION SERVICES
+  # ============================================================
+
+  # --- Auth Service ---
+  auth-service:
+    <<: *service-defaults
+    build:
+      context: ../auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    depends_on:
+      postgres-shared:
+        condition: service_healthy
+    environment:
+      APP_PORT: ":8080"
+      DB_HOST: postgres-shared
+      DB_PORT: "5432"
+      DB_NAME: usersdb
+      DB_USER: postgres
+      DB_PASSWORD: postgres_password
+      DB_MAX_RETRIES: "30"
+      DB_RETRY_INTERVAL: "3"
+      JWT_SECRET: changeme_super_secret_jwt_key_please_rotate
+      BROKER_TYPE: KAFKA
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_AUTH_TOPIC: "auth"
+      KAFKA_USER_CREATED_EVENT_TYPE: "user.created"
+      CONFIRM_BASE_URL: "http://localhost/api/v1"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.auth.rule=PathPrefix(`/api/v1/register`) || PathPrefix(`/api/v1/login`) || PathPrefix(`/api/v1/confirm`)
+      - traefik.http.routers.auth.entrypoints=web
+      - traefik.http.services.auth.loadbalancer.server.port=8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # --- Profile Service ---
+  profile-service:
+    <<: *service-defaults
+    build:
+      context: ../profile-service
+      dockerfile: Dockerfile
+    container_name: profile-service
+    depends_on:
+      postgres-profiles:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      APP_PORT: "8080"
+      DB_HOST: postgres-profiles
+      DB_PORT: "5432"
+      DB_NAME: profiledb
+      DB_USER: profile_user
+      DB_PASSWORD: profile_password
+      BROKER_TYPE: KAFKA
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_PROFILE_TOPIC: "profile"
+      KAFKA_BILLING_TOPIC: "billing"
+      KAFKA_BILLING_GROUP: "profilesvc.billing"
+      KAFKA_PROFILE_CREATED_EVENT_TYPE: "profile.created"
+      KAFKA_BILLING_ACCOUNT_CREATED_EVENT_TYPE: "billing.account.created"
+      BILLING_URL: http://billing-service:8080
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.profile.rule=PathPrefix(`/api/v1/profile`)
+      - traefik.http.routers.profile.entrypoints=web
+      - traefik.http.services.profile.loadbalancer.server.port=8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/metrics > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # --- Order Service ---
+  order-service:
+    <<: *service-defaults
+    build:
+      context: ../order-svc
+      dockerfile: Dockerfile
+    container_name: order-service
+    depends_on:
+      postgres-orders:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      APP_PORT: "8080"
+      BROKER_TYPE: KAFKA
+      PG_HOST: postgres-orders
+      PG_PORT: "5432"
+      PG_DATABASE: orderdb
+      PG_USER: order_user
+      PG_PASSWORD: order_password
+      PG_SSLMODE: disable
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_ORDER_TOPIC: "order"
+      KAFKA_ORDER_CREATED_EVENT_TYPE: "order.created"
+      KAFKA_ORDER_UPDATED_EVENT_TYPE: "order.updated"
+      KAFKA_BILLING_TOPIC: "billing"
+      KAFKA_BILLING_GROUP: "ordersvc.billing"
+      KAFKA_BILLING_EVENT_TYPES: "billing.payment.success,billing.payment.required"
+      ADVERT_CMD_URL: http://advert-cmd-svc:8080
+      BILLING_URL: http://billing-service:8080
+      DELIVERY_URL: http://delivery-service:8080
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.order.rule=PathPrefix(`/api/v1/order`)
+      - traefik.http.routers.order.entrypoints=web
+      - traefik.http.services.order.loadbalancer.server.port=8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # --- Billing Service ---
+  billing-service:
+    <<: *service-defaults
+    build:
+      context: ../billing-svc
+      dockerfile: Dockerfile
+    container_name: billing-service
+    depends_on:
+      postgres-billing:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      APP_PORT: "8080"
+      BROKER_TYPE: KAFKA
+      PG_HOST: postgres-billing
+      PG_PORT: "5432"
+      PG_DATABASE: billingdb
+      PG_USER: billing_user
+      PG_PASSWORD: billing_password
+      PG_SSLMODE: disable
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_BILLING_TOPIC: "billing"
+      KAFKA_PROFILE_TOPIC: "profile"
+      KAFKA_PROFILE_GROUP: "billingsvc.profile"
+      KAFKA_PROFILE_EVENT_TYPES: "profile.created"
+      KAFKA_ORDER_TOPIC: "order"
+      KAFKA_ORDER_GROUP: "billingsvc.order"
+      KAFKA_ORDER_EVENT_TYPES: "order.created,order.updated"
+      KAFKA_BILLING_ACCOUNT_CREATED_EVENT_TYPE: "billing.account.created"
+      KAFKA_BILLING_PAYMENT_SUCCESS_EVENT_TYPE: "billing.payment.success"
+      KAFKA_BILLING_PAYMENT_REQUIRED_EVENT_TYPE: "billing.payment.required"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.billing.rule=PathPrefix(`/api/v1/billing`) || PathPrefix(`/api/v1/transaction`)
+      - traefik.http.routers.billing.entrypoints=web
+      - traefik.http.services.billing.loadbalancer.server.port=8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # --- Delivery Service ---
+  delivery-service:
+    <<: *service-defaults
+    build:
+      context: ../delivery-service
+      dockerfile: Dockerfile
+    container_name: delivery-service
+    depends_on:
+      postgres-delivery:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      APP_PORT: "8080"
+      BROKER_TYPE: KAFKA
+      PG_HOST: postgres-delivery
+      PG_PORT: "5432"
+      PG_USER: delivery_user
+      PG_PASSWORD: delivery_password
+      PG_DATABASE: deliverydb
+      PG_SSLMODE: disable
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_ORDER_TOPIC: order
+      KAFKA_ORDER_GROUP: delivery.order
+      KAFKA_DELIVERY_TOPIC: delivery
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.delivery.rule=PathPrefix(`/api/v1/delivery`) || PathPrefix(`/api/v1/providers`)
+      - traefik.http.routers.delivery.entrypoints=web
+      - traefik.http.services.delivery.loadbalancer.server.port=8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # --- Notification Service ---
+  notification-service:
+    <<: *service-defaults
+    build:
+      context: ../notification-svc
+      dockerfile: Dockerfile
+    container_name: notification-service
+    depends_on:
+      postgres-notifications:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      APP_PORT: "8080"
+      BROKER_TYPE: KAFKA
+      PG_HOST: postgres-notifications
+      PG_PORT: "5432"
+      PG_DATABASE: notificationdb
+      PG_USER: notification_user
+      PG_PASSWORD: notification_password
+      PG_SSLMODE: disable
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_BILLING_TOPIC: "order-payment"
+      KAFKA_BILLING_GROUP: "notificationsvc.billing"
+      # замена биндинга payment.*
+      KAFKA_BILLING_EVENT_TYPES: "PAYMENT_SUCCESS,PAYMENT_FAILED"
+      KAFKA_AUTH_TOPIC: "auth"
+      KAFKA_AUTH_GROUP: "notificationsvc.auth"
+      KAFKA_AUTH_EVENT_TYPES: "user.created"
+
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.notification.rule=PathPrefix(`/api/v1/notifications`) || PathPrefix(`/api/v1/notification/inbox_mock`)
+      - traefik.http.routers.notification.entrypoints=web
+      - traefik.http.services.notification.loadbalancer.server.port=8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # --- Dialog Service ---
+  dialog-service:
+    <<: *service-defaults
+    build:
+      context: ../dialog-svc
+      dockerfile: Dockerfile
+    container_name: dialog-service
+    depends_on:
+      postgres-dialog:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_PORT: "8080"
+      CITUS_HOST: postgres-dialog
+      CITUS_PORT: "5432"
+      CITUS_DB: dialogdb
+      CITUS_USER: dialog_user
+      CITUS_PASSWORD: dialog_password
+      REDIS_ADDR: redis:6379
+      BROADCAST_TYPE: redis
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dialog.rule=PathPrefix(`/api/v1/dialog`) || PathPrefix(`/api/v1/conversations`) || PathPrefix(`/api/v1/ws`)
+      - traefik.http.routers.dialog.entrypoints=web
+      - traefik.http.services.dialog.loadbalancer.server.port=8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # --- Advert CMD Service ---
+  advert-cmd-svc:
+    <<: *service-defaults
+    build:
+      context: ../advert-cmd-svc
+      dockerfile: Dockerfile
+    container_name: advert-cmd-svc
+    depends_on:
+      postgres-advertcmd:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    environment:
+      HTTP_ADDR: ":8080"
+      BROKER_TYPE: KAFKA
+      DATABASE_URL: postgres://advertcmd_user:advertcmd_password@postgres-advertcmd:5432/advertcmddb?sslmode=disable
+      KAFKA_BROKERS: kafka:9092
+      VALIDATION_TOPIC: "pending-queue"
+      POST_VALIDATION_TOPIC: "post-validation"
+      VALIDATION_GROUP_ID: "advert-cmd-svc-validation"
+      OUTBOX_INTERVAL: "1s"
+      OUTBOX_BATCH_SIZE: "100"
+      OPENSEARCH_URL: http://opensearch:9200
+      S3_ENDPOINT: ""
+      S3_BUCKET: ""
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.advert-cmd.rule=PathPrefix(`/api/v1/adverts`) || PathPrefix(`/api/v1/categories`) || PathPrefix(`/api/v1/brands`) || PathPrefix(`/api/v1/colors`)
+      - traefik.http.routers.advert-cmd.entrypoints=web
+      - traefik.http.services.advert-cmd.loadbalancer.server.port=8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # --- Advert Validation Service ---
+  advert-validation-svc:
+    <<: *service-defaults
+    build:
+      context: ../advert-validation-svc
+      dockerfile: Dockerfile
+    container_name: advert-validation-svc
+    depends_on:
+      postgres-validation:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      HTTP_ADDR: ":8080"
+      DATABASE_URL: postgres://validation_user:validation_password@postgres-validation:5432/validationdb?sslmode=disable
+      KAFKA_BOOTSTRAP_SERVER: kafka:9092
+      KAFKA_GROUP_ID: validation-svc
+      PENDING_TOPIC: pending-queue
+      POST_VALIDATION_TOPIC: post-validation
+      MOCK_LLM: "true"
+      MOCK_AUTO_APPROVE: "true"
+      WORKER_COUNT: "4"
+      CLAIM_BATCH_SIZE: "10"
+      POLL_INTERVAL: 2s
+      LEASE_TIMEOUT: 5m
+      MAX_ATTEMPTS: "3"
+      HYBRID_CONFIDENCE_THRESHOLD: "0.8"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/healthz > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # --- Advert Postprocessor ---
+  advert-postprocessor:
+    <<: *service-defaults
+    build:
+      context: ../advert-postprocessor
+      dockerfile: Dockerfile
+    container_name: advert-postprocessor
+    depends_on:
+      kafka:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      advert-cmd-svc:
+        condition: service_healthy
+      postgres-gis:
+        condition: service_healthy
+    environment:
+      APP_PORT: "8080"
+      BROKER_TYPE: KAFKA
+      KAFKA_BROKERS: kafka:9092
+      POST_VALIDATION_TOPIC: "post-validation"
+      CONSUMER_GROUP_ID: "advert-postprocessor"
+      OPENSEARCH_URL: http://opensearch:9200
+      OPENSEARCH_INDEX: "adverts"
+      ADVERT_SERVICE_URL: http://advert-cmd-svc:8080
+      GIS_DATABASE_URL: postgres://gis_user:gis_password@postgres-gis:5432/gis?sslmode=disable
+      EMBEDDINGS_ENABLED: "false"
+      METRICS_ADDR: ":9090"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/metrics > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # --- Advert Query Service ---
+  advert-query:
+    <<: *service-defaults
+    build:
+      context: ../advert-query
+      dockerfile: Dockerfile
+    container_name: advert-query
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      OPENSEARCH_ADDRESS: http://opensearch:9200
+      OPENSEARCH_INDEX: "adverts"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.advert-query.rule=PathPrefix(`/api/v1/search`)
+      - traefik.http.routers.advert-query.entrypoints=web
+      - traefik.http.services.advert-query.loadbalancer.server.port=8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/v1/search > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # --- BFF (Backend For Frontend) ---
+  bff:
+    <<: *service-defaults
+    build:
+      context: ../bff-finalproj
+      dockerfile: Dockerfile
+    container_name: bff
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      profile-service:
+        condition: service_healthy
+      order-service:
+        condition: service_healthy
+      billing-service:
+        condition: service_healthy
+      delivery-service:
+        condition: service_healthy
+      dialog-service:
+        condition: service_healthy
+      advert-cmd-svc:
+        condition: service_healthy
+      advert-query:
+        condition: service_healthy
+    environment:
+      APP_PORT: "8080"
+      AUTH_URL: http://auth-service:8080
+      PROFILE_URL: http://profile-service:8080
+      ADVERT_CMD_URL: http://advert-cmd-svc:8080
+      ADVERT_QUERY_URL: http://advert-query:8080
+      ORDER_URL: http://order-service:8080
+      BILLING_URL: http://billing-service:8080
+      DELIVERY_URL: http://delivery-service:8080
+      DIALOG_URL: http://dialog-service:8080
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.bff.rule=PathPrefix(`/api/v1/bff`)
+      - traefik.http.routers.bff.entrypoints=web
+      - traefik.http.services.bff.loadbalancer.server.port=8080
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+# ============================================================
+# VOLUMES
+# ============================================================
+volumes:
+  kafka-data:
+  redis-data:
+  opensearch-data:
+  prometheus-data:
+  pg-shared-data:
+  pg-profiles-data:
+  pg-orders-data:
+  pg-billing-data:
+  pg-notifications-data:
+  pg-delivery-data:
+  pg-advertcmd-data:
+  pg-dialog-data:
+  pg-validation-data:
+  pg-gis-data:
+
+# ============================================================
+# NETWORKS
+# ============================================================
+networks:
+  finalproj-net:
+    driver: bridge

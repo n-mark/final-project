@@ -1,0 +1,8 @@
+{
+  "id": "final-project-e2e-environment-v2",
+  "name": "Final Project - Local Environment",
+  "values": [
+    { "key": "base_url", "value": "http://localhost", "type": "default", "enabled": true }
+  ],
+  "_postman_variable_scope": "environment"
+}

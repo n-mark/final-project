@@ -12,12 +12,12 @@ data:
   ADVERT_CMD_URL: "http://advert-cmd-svc:8080"
   ADVERT_QUERY_URL: "http://advert-query:8080"
   ADVERT_VALIDATION_URL: "http://advert-validation-svc:8080"
-  ADVERT_POSTPROCESSOR_URL: "http://advert-postprocessor:8080"
-  ORDER_URL: "http://order-svc:8080"
-  BILLING_URL: "http://billing-svc:8080"
+  ADVERT_POSTPROCESSOR_URL: "http://advert-postprocessor:9090"
+  ORDER_URL: "http://order-service:8080"
+  BILLING_URL: "http://billing-service:8080"
   DELIVERY_URL: "http://delivery-service:8080"
-  NOTIFICATION_URL: "http://notification-svc:8080"
-  DIALOG_URL: "http://dialog-svc:8080"
+  NOTIFICATION_URL: "http://notification-service:8080"
+  DIALOG_URL: "http://dialog-service:8080"
   BFF_URL: "http://advert-proj-bff:8080"
 
   # Databases
@@ -29,6 +29,7 @@ data:
   PG_HOST_DELIVERY: "postgres-delivery"
   PG_HOST_ADVERTCMD: "postgres-advertcmd"
   PG_HOST_DIALOG: "postgres-dialog"
+  PG_HOST_GIS: "postgres-gis"
   PG_PORT: "5432"
   PG_SSLMODE: "disable"
 

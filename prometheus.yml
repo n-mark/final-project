@@ -1,0 +1,56 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "auth-service"
+    static_configs:
+      - targets: ["auth-service:8080"]
+
+  - job_name: "profile-service"
+    static_configs:
+      - targets: ["profile-service:8080"]
+
+  - job_name: "order-service"
+    static_configs:
+      - targets: ["order-service:8080"]
+
+  - job_name: "billing-service"
+    static_configs:
+      - targets: ["billing-service:8080"]
+
+  - job_name: "delivery-service"
+    static_configs:
+      - targets: ["delivery-service:8080"]
+
+  - job_name: "notification-service"
+    static_configs:
+      - targets: ["notification-service:8080"]
+
+  - job_name: "dialog-service"
+    static_configs:
+      - targets: ["dialog-service:8080"]
+
+  - job_name: "advert-cmd-svc"
+    static_configs:
+      - targets: ["advert-cmd-svc:8080"]
+
+  - job_name: "advert-validation-svc"
+    static_configs:
+      - targets: ["advert-validation-svc:8080"]
+
+  - job_name: "advert-postprocessor"
+    static_configs:
+      - targets: ["advert-postprocessor:9090"]
+
+  - job_name: "advert-query"
+    static_configs:
+      - targets: ["advert-query:8080"]
+
+  - job_name: "bff"
+    static_configs:
+      - targets: ["advert-proj-bff:8080"]

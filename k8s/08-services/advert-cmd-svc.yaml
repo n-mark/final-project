@@ -5,15 +5,17 @@ metadata:
   name: advert-cmd-svc-config
   namespace: final-proj
 data:
-  APP_PORT: "8080"
+  HTTP_ADDR: ":8080"
   BROKER_TYPE: "KAFKA"
-  PG_HOST: "postgres-advertcmd"
-  PG_PORT: "5432"
-  PG_DATABASE: "advertcmddb"
-  PG_SSLMODE: "disable"
   KAFKA_BROKERS: "kafka:9092"
-  OPENSEARCH_URL: "http://opensearch:9200"
+  VALIDATION_TOPIC: "pending-queue"
+  POST_VALIDATION_TOPIC: "post-validation"
+  VALIDATION_GROUP_ID: "advert-cmd-svc-validation"
+  OUTBOX_INTERVAL: "1s"
+  OUTBOX_BATCH_SIZE: "100"
+  LOG_LEVEL: "info"
   S3_ENDPOINT: ""
+  S3_REGION: "ru-1"
   S3_BUCKET: ""
 ---
 apiVersion: v1
@@ -23,8 +25,7 @@ metadata:
   namespace: final-proj
 type: Opaque
 stringData:
-  PG_USER: "advertcmd_user"
-  PG_PASSWORD: "advertcmd_password"
+  DATABASE_URL: "postgres://advertcmd_user:advertcmd_password@postgres-advertcmd:5432/advertcmddb?sslmode=disable"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -63,11 +64,11 @@ spec:
             - secretRef:
                 name: shared-secrets
           readinessProbe:
-            httpGet: { path: /health, port: http }
+            httpGet: { path: /healthz, port: http }
             initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
-            httpGet: { path: /health, port: http }
+            httpGet: { path: /healthz, port: http }
             initialDelaySeconds: 15
             periodSeconds: 10
           resources:

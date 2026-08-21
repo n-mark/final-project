@@ -1,0 +1,1 @@
+CREATE INDEX idx_stations_location ON stations USING GIST(location);

@@ -1,0 +1,11 @@
+INSERT INTO public.color VALUES ('black', 'Черный', 'черный черная черное чёрный чёрная чёрное', '#000000');
+INSERT INTO public.color VALUES ('gray', 'Серый', 'серый серая серое', '#9D9D9D');
+INSERT INTO public.color VALUES ('white', 'Белый', 'белый белая белое', '#FFFFFF');
+INSERT INTO public.color VALUES ('red', 'Красный', 'красный красная красное', '#BE2633');
+INSERT INTO public.color VALUES ('pink', 'Розовый', 'розовый розовая розовое', '#E06F8B');
+INSERT INTO public.color VALUES ('brown', 'Коричневый', 'коричневый коричневая коричневое', '#A46422');
+INSERT INTO public.color VALUES ('orange', 'Оранжевый', 'оранжевый оранжевая оранжевое', '#EB8931');
+INSERT INTO public.color VALUES ('yellow', 'Желтый', 'желтый желтая желтое', '#F7E26B');
+INSERT INTO public.color VALUES ('green', 'Зеленый', 'зеленый зеленая зеленое', '#44891A');
+INSERT INTO public.color VALUES ('darkblue', 'Синий', 'синий синяя синее', '#005784');
+INSERT INTO public.color VALUES ('blue', 'Голубой', 'голубой голубая голубое', '#31A2F2');

@@ -22,16 +22,24 @@ SERVICES=(
   "advert-postprocessor:/Users/nikitamarkovskij/Desktop/advert-postprocessor"
 )
 
+PLATFORMS="linux/amd64,linux/arm64"
+
 for entry in "${SERVICES[@]}"; do
   image="${entry%%:*}"
   path="${entry##*:}"
-  echo "=== Building $image from $path ==="
-  docker build -t "$REGISTRY/$image:$TAG" "$path"
-  docker push "$REGISTRY/$image:$TAG"
+  echo "=== Building $image from $path (multi-arch) ==="
+  docker buildx build \
+    --platform "$PLATFORMS" \
+    -t "$REGISTRY/$image:$TAG" \
+    --push \
+    "$path"
 done
 
-echo "=== Building BFF from separate repo ==="
-docker build -t "$REGISTRY/advert-proj-bff:$TAG" /Users/nikitamarkovskij/Desktop/bff-finalproj
-docker push "$REGISTRY/advert-proj-bff:$TAG"
+echo "=== Building BFF from separate repo (multi-arch) ==="
+docker buildx build \
+  --platform "$PLATFORMS" \
+  -t "$REGISTRY/advert-proj-bff:$TAG" \
+  --push \
+  /Users/nikitamarkovskij/Desktop/bff-finalproj
 
 echo "=== All images pushed ==="

@@ -5,13 +5,11 @@ metadata:
   name: dialog-service-config
   namespace: final-proj
 data:
-  APP_PORT: "8080"
-  PG_HOST: "postgres-dialog"
-  PG_PORT: "5432"
-  PG_DATABASE: "dialogdb"
-  PG_SSLMODE: "disable"
-  REDIS_HOST: "redis"
-  REDIS_PORT: "6379"
+  SERVER_ADDR: ":8080"
+  CITUS_HOST: "postgres-dialog"
+  CITUS_PORT: "5432"
+  CITUS_DB: "dialogdb"
+  REDIS_ADDR: "redis:6379"
   BROADCAST_TYPE: "redis"
 ---
 apiVersion: v1
@@ -21,8 +19,8 @@ metadata:
   namespace: final-proj
 type: Opaque
 stringData:
-  PG_USER: "dialog_user"
-  PG_PASSWORD: "dialog_password"
+  CITUS_USER: "dialog_user"
+  CITUS_PASSWORD: "dialog_password"
 ---
 apiVersion: apps/v1
 kind: Deployment
