@@ -1,6 +1,6 @@
-# Final Project (маркетплейс объявлений)
+# Final Project (интернет-сервис по размещению объявлений)
 
-Репозиторий деплоя всего стека микросервисов маркетплейса объявлений. Содержит Kubernetes-манифесты, Helm-чарт, скрипты сборки образов и интеграционные/смоук-тесты.
+Репозиторий деплоя всего стека микросервисов интернет-сервиса по размещению объявлений. Содержит Kubernetes-манифесты, Helm-чарт, скрипты сборки образов и интеграционные/смоук-тесты.
 
 - **GitHub:** https://github.com/n-mark/final-project
 
@@ -17,12 +17,11 @@
 | notification-service (уведомления) | [n-mark/notificationsvc](https://github.com/n-mark/notificationsvc) | [`mblkuta/notificationsvc`](https://hub.docker.com/r/mblkuta/notificationsvc) |
 | delivery-service (доставка) | [n-mark/delivery-service](https://github.com/n-mark/delivery-service) | [`mblkuta/delivery-service`](https://hub.docker.com/r/mblkuta/delivery-service) |
 | dialog-service (диалоги) | [n-mark/dialog-svc](https://github.com/n-mark/dialog-svc) | [`mblkuta/dialog-svc`](https://hub.docker.com/r/mblkuta/dialog-svc) |
-| advert-cmd-svc (команды объявлений) | [n-mark/advert-cmd](https://github.com/n-mark/advert-cmd) | [`mblkuta/advert-cmd-svc`](https://hub.docker.com/r/mblkuta/advert-cmd-svc) |
+| advert-cmd-svc (command-сервис) | [n-mark/advert-cmd](https://github.com/n-mark/advert-cmd) | [`mblkuta/advert-cmd-svc`](https://hub.docker.com/r/mblkuta/advert-cmd-svc) |
 | advert-query (поиск объявлений) | [n-mark/advert-query-go](https://github.com/n-mark/advert-query-go) | [`mblkuta/advert-query`](https://hub.docker.com/r/mblkuta/advert-query) |
 | advert-validation-svc (валидация) | [n-mark/advert-validation](https://github.com/n-mark/advert-validation) | [`mblkuta/advert-validation-svc`](https://hub.docker.com/r/mblkuta/advert-validation-svc) |
 | advert-postprocessor (постобработка) | [n-mark/advert-postprocessor](https://github.com/n-mark/advert-postprocessor) | [`mblkuta/advert-postprocessor`](https://hub.docker.com/r/mblkuta/advert-postprocessor) |
 | BFF (backend for frontend) | [n-mark/advert-proj-bff](https://github.com/n-mark/advert-proj-bff) | [`mblkuta/advert-proj-bff`](https://hub.docker.com/r/mblkuta/advert-proj-bff) |
-| interaction (документация/схемы) | [n-mark/interaction](https://github.com/n-mark/interaction) | — |
 | final_project (этот репозиторий) | [n-mark/final-project](https://github.com/n-mark/final-project) | — |
 
 Профиль DockerHub: https://hub.docker.com/u/mblkuta
