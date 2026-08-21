@@ -1,8 +1,12 @@
-# Final Project (интернет-сервис по размещению объявлений)
+# Проектная работа: Интернет-сервис по размещению объявлений
 
 Репозиторий деплоя всего стека микросервисов интернет-сервиса по размещению объявлений. Содержит Kubernetes-манифесты, Helm-чарт, скрипты сборки образов и интеграционные/смоук-тесты.
 
 - **GitHub:** https://github.com/n-mark/final-project
+
+## Диаграмма C4 (уровень контейнеров)
+
+![C4 Container Level C2](c4/C4_container_level_C2.png)
 
 ## Состав проекта
 
@@ -89,23 +93,15 @@ helm upgrade --install final-project helm/final-project \
 
 ## Доступ через Traefik
 
-Добавьте в `/etc/hosts`:
+При деплое в minikube добавьте в `/etc/hosts`:
 
 ```text
 127.0.0.1 finalproj.local
 ```
+Или публичный IP при использовании внешнего кластера
 
 Публичные API доступны по адресу `http://finalproj.local/api/v1/...`.
 
-## BFF
-
-BFF находится в отдельном репозитории: https://github.com/n-mark/advert-proj-bff
-
-Агрегирующие эндпоинты:
-
-- `GET /api/v1/bff/adverts/{id}`
-- `GET /api/v1/bff/orders/{id}`
-- `GET /api/v1/bff/users/{id}/cabinet`
 
 ## Сборка и публикация образов
 
@@ -115,9 +111,35 @@ BFF находится в отдельном репозитории: https://git
 
 Скрипт собирает мульти-архитектурные (linux/amd64, linux/arm64) образы всех сервисов в registry `mblkuta` (по умолчанию тег `finalproj-latest`) и публикует их в DockerHub.
 
+## Запуск Newman-тестов
+
+Интеграционные / смоук-тесты находятся в `tests/newman/` и покрывают полный пользовательский сценарий (регистрация, подтверждение, логин, профиль, объявление, поиск, диалог, заказ, доставка, оплата, уведомления, BFF).
+
+```bash
+# Установить newman (если ещё не установлен)
+npm install -g newman
+
+# Запустить тесты
+cd tests/newman
+newman run tests/newman/final-project-newman-collection.json \
+  --env-var "base_url=http://finalproj.local" \
+  --timeout-request 30000
+```
+
 ## Примечания
 
 - Все сервисы по умолчанию используют Docker-тег `finalproj-latest`.
 - Kafka развёрнут в режиме KRaft (без Zookeeper).
-- RabbitMQ намеренно не используется; основной брокер — Kafka.
 - OpenSearch настроен на 3 шарда / 2 реплики через индекс-шаблон.
+
+## Удаление (Helm uninstall)
+
+```bash
+helm uninstall final-project --namespace final-proj
+```
+
+После удаления релиза namespace `final-proj` остаётся — при необходимости его можно удалить вручную:
+
+```bash
+kubectl delete namespace final-proj
+```

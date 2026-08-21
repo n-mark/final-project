@@ -2,5 +2,8 @@ dependencies:
 - name: kafka
   repository: https://charts.bitnami.com/bitnami
   version: 32.4.3
-digest: sha256:16f642dc6bc01ea866554b8faa4dd0483cc1f74ca47dc132ba94e42a5950372b
-generated: "2026-08-19T23:35:32.455275+03:00"
+- name: opensearch
+  repository: https://opensearch-project.github.io/helm-charts
+  version: 2.20.0
+digest: sha256:f3e6d6e51435bc19681c9fb2460fb09fd38f525da7ce78e4013c864e6ad69dff
+generated: "2026-08-21T11:59:52.61568+03:00"

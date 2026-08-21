@@ -10,3 +10,7 @@ dependencies:
     version: "32.4.3"
     repository: "https://charts.bitnami.com/bitnami"
     condition: kafka.enabled
+  - name: opensearch
+    version: "2.20.0"
+    repository: "https://opensearch-project.github.io/helm-charts"
+    condition: opensearch.enabled

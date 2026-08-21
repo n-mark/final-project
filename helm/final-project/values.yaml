@@ -9,7 +9,7 @@ replicas:
   default: 1
 
 postInstallRestart:
-  enabled: true
+  enabled: false
 
 resources:
   requests:
@@ -103,15 +103,17 @@ kafka:
   controller:
     replicaCount: 3
     controllerOnly: false
+    # Tune JVM heap explicitly so the JVM cannot blow past the container limit.
+    heapOpts: "-Xms1024m -Xmx1024m"
     persistence:
       size: 2Gi
     resources:
       requests:
         cpu: "200m"
-        memory: "512Mi"
+        memory: "1Gi"
       limits:
         cpu: "1"
-        memory: "1Gi"
+        memory: "2Gi"
   # The app services connect to `kafka:9092` without credentials, so every
   # listener must be PLAINTEXT (chart default is SASL_PLAINTEXT).
   listeners:
@@ -121,6 +123,53 @@ kafka:
       protocol: PLAINTEXT
     interbroker:
       protocol: PLAINTEXT
+  # Declaratively create every topic the stack uses (replication factor 3,
+  # min.insync.replicas 2). Avoids races during first deploy.
+  provisioning:
+    enabled: true
+    numPartitions: 3
+    replicationFactor: 3
+    topics:
+      - name: auth
+        partitions: 3
+        replicationFactor: 3
+        config:
+          min.insync.replicas: "2"
+      - name: profile
+        partitions: 3
+        replicationFactor: 3
+        config:
+          min.insync.replicas: "2"
+      - name: billing
+        partitions: 3
+        replicationFactor: 3
+        config:
+          min.insync.replicas: "2"
+      - name: order
+        partitions: 3
+        replicationFactor: 3
+        config:
+          min.insync.replicas: "2"
+      - name: delivery
+        partitions: 3
+        replicationFactor: 3
+        config:
+          min.insync.replicas: "2"
+      - name: order-payment
+        partitions: 3
+        replicationFactor: 3
+        config:
+          min.insync.replicas: "2"
+      - name: pending-queue
+        partitions: 3
+        replicationFactor: 3
+        config:
+          min.insync.replicas: "2"
+      - name: post-validation
+        partitions: 3
+        replicationFactor: 3
+        config:
+          min.insync.replicas: "2"
 
 redis:
   enabled: true
@@ -129,9 +178,40 @@ redis:
 
 opensearch:
   enabled: true
+  # Service name becomes `opensearch` (http port 9200), so all the app services
+  # keep connecting to `http://opensearch:9200` unchanged.
+  fullnameOverride: opensearch
+  masterService: opensearch
+  clusterName: finalproj-opensearch
   replicas: 3
-  storage: 5Gi
-  image: opensearchproject/opensearch:2.14.0
+  # Plain HTTP; the bespoke stack ran with the security plugin off.
+  protocol: http
+  opensearchJavaOpts: "-Xms512m -Xmx512m"
+  image:
+    repository: opensearchproject/opensearch
+    tag: "2.14.0"
+  config:
+    opensearch.yml: |
+      cluster.name: finalproj-opensearch
+      network.host: 0.0.0.0
+      plugins.security.disabled: true
+  securityConfig:
+    enabled: false
+  extraEnvs:
+    - name: DISABLE_INSTALL_DEMO_CONFIG
+      value: "true"
+    - name: DISABLE_SECURITY_PLUGIN
+      value: "true"
+  resources:
+    requests:
+      cpu: "300m"
+      memory: "1Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+  persistence:
+    size: 5Gi
+  # Kept for the parent chart's index-template Job (not part of the upstream chart).
   index: adverts
 
 traefik:
