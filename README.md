@@ -4,9 +4,9 @@
 
 - **GitHub:** https://github.com/n-mark/final-project
 
-## Диаграмма C4 (уровень контейнеров)
+## Архитектура
 
-![C4 Container Level C2](c4/C4_container_level_C2.png)
+Архитектура проекта описана [здесь](/ARCHITECTURE.md)
 
 ## Состав проекта
 
