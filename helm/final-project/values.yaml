@@ -222,6 +222,7 @@ traefik:
 # Per-service environment (ConfigMap) and secret stringData.
 services:
   auth:
+    replicas: 3
     name: auth-service
     image: auth-service
     port: 8080
@@ -244,6 +245,7 @@ services:
       JWT_SECRET: "changeme_super_secret_jwt_key_please_rotate"
 
   profile:
+    replicas: 3
     name: profile-service
     image: profile-service
     port: 8080
@@ -268,6 +270,7 @@ services:
       DB_PASSWORD: "profile_password"
 
   order:
+    replicas: 3
     name: order-service
     image: ordersvc
     port: 8080
@@ -290,6 +293,7 @@ services:
       PG_PASSWORD: "order_password"
 
   billing:
+    replicas: 3
     name: billing-service
     image: billingsvc
     port: 8080
@@ -309,6 +313,7 @@ services:
       PG_PASSWORD: "billing_password"
 
   notification:
+    replicas: 2
     name: notification-service
     image: notificationsvc
     port: 8080
@@ -334,6 +339,7 @@ services:
       PG_PASSWORD: "notification_password"
 
   delivery:
+    replicas: 2
     name: delivery-service
     image: delivery-service
     port: 8080
@@ -356,6 +362,7 @@ services:
       PG_PASSWORD: "delivery_password"
 
   dialog:
+    replicas: 2
     name: dialog-service
     image: dialog-svc
     port: 8080
@@ -373,6 +380,7 @@ services:
       CITUS_PASSWORD: "dialog_password"
 
   advertCmd:
+    replicas: 3
     name: advert-cmd-svc
     image: advert-cmd-svc
     port: 8080
@@ -393,6 +401,7 @@ services:
       DATABASE_URL: "postgres://advertcmd_user:advertcmd_password@postgres-advertcmd:5432/advertcmddb?sslmode=disable"
 
   advertQuery:
+    replicas: 3
     name: advert-query
     image: advert-query
     port: 8080
@@ -403,6 +412,7 @@ services:
       OPENSEARCH_INDEX: "adverts"
 
   advertValidation:
+    replicas: 1
     name: advert-validation-svc
     image: advert-validation-svc
     port: 8080
@@ -427,6 +437,7 @@ services:
       DATABASE_URL: "postgres://validation_user:validation_password@postgres-validation:5432/validationdb?sslmode=disable"
 
   advertPostprocessor:
+    replicas: 1
     name: advert-postprocessor
     image: advert-postprocessor
     port: 9090
@@ -446,6 +457,7 @@ services:
       METRICS_ADDR: ":9090"
 
   bff:
+    replicas: 3
     name: advert-proj-bff
     image: advert-proj-bff
     port: 8080
