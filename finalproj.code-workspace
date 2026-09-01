@@ -1,0 +1,43 @@
+{
+	"folders": [
+		{
+			"path": "../delivery-service"
+		},
+		{
+			"path": "../profile-service"
+		},
+		{
+			"path": "../auth-service"
+		},
+		{
+			"path": "../notification-svc"
+		},
+		{
+			"path": "../order-svc"
+		},
+		{
+			"path": "../dialog-svc"
+		},
+		{
+			"path": "../advert-query"
+		},
+		{
+			"path": "../advert-postprocessor"
+		},
+		{
+			"path": "../advert-cmd-svc"
+		},
+		{
+			"path": "../advert-validation-svc"
+		},
+		{
+			"path": "."
+		},
+		{
+			"path": "../billing-svc"
+		},
+		{
+			"path": "../bff-finalproj"
+		}
+	]
+}

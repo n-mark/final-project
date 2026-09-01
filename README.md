@@ -4,9 +4,9 @@
 
 - **GitHub:** https://github.com/n-mark/final-project
 
-## Диаграмма C4 (уровень контейнеров)
+## Архитектура
 
-![C4 Container Level C2](c4/C4_container_level_C2.png)
+Архитектура проекта описана [здесь](/ARCHITECTURE.md)
 
 ## Состав проекта
 
@@ -113,17 +113,22 @@ helm upgrade --install final-project helm/final-project \
 
 ## Запуск Newman-тестов
 
-Интеграционные / смоук-тесты находятся в `tests/newman/` и покрывают полный пользовательский сценарий (регистрация, подтверждение, логин, профиль, объявление, поиск, диалог, заказ, доставка, оплата, уведомления, BFF).
+Cмоук-тесты находятся в `tests_highload/`.
+Для запуска необходим предустановленный инструмент нагрузочного тестирования `k6`
 
+Эмуляция регистрации пользователя и размещения объявлений
 ```bash
-# Установить newman (если ещё не установлен)
-npm install -g newman
-
-# Запустить тесты
-cd tests/newman
-newman run tests/newman/final-project-newman-collection.json \
-  --env-var "base_url=http://finalproj.local" \
-  --timeout-request 30000
+DAU_SCENARIO=1k  k6 run tests_highload/load-test-sellers.js
+DAU_SCENARIO=50k k6 run tests_highload/load-test-sellers.js
+DAU_SCENARIO=100k k6 run tests_highload/load-test-sellers.js
+DAU_SCENARIO=1m  k6 run tests_highload/load-test-sellers.js
+```
+Эмуляция просмотра объявлений
+```bash
+DAU_SCENARIO=1k  k6 run tests_highload/load-test-browsers.js
+DAU_SCENARIO=50k k6 run tests_highload/load-test-browsers.js
+DAU_SCENARIO=100k k6 run tests_highload/load-test-browsers.js
+DAU_SCENARIO=1m  k6 run tests_highload/load-test-browsers.js
 ```
 
 ## Примечания

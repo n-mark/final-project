@@ -36,7 +36,7 @@ metadata:
   labels:
     app: {{ $name }}
 spec:
-  replicas: {{ $.Values.replicas.default }}
+  replicas: {{ $svc.replicas | default $.Values.replicas.default }}
   selector:
     matchLabels:
       app: {{ $name }}
